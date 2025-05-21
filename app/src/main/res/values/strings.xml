@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">My Time</string>
+    <string name="title_home">Home</string>
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_notifications">Notifications</string>
+    <string name="screen_day">День</string>
+    <string name="screen_week">Неделя</string>
+    <string name="screen_month">Месяц</string>
+    <string name="screen_year">Год</string>
+    <string name="desc_open_drawer">Открыть боковое меню</string>
 </resources>
