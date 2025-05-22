@@ -4,19 +4,28 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -27,6 +36,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,9 +56,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -60,11 +76,14 @@ import com.firexrwtinc.mytime.ui.theme.MyTimeTheme
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
 import java.time.format.TextStyle as JavaTextStyle
+
+/* TODO: Надо сделать везде красивые анимации */
 
 sealed class Screen(val route: String, val resourceId: Int, val icon: ImageVector) {
     object DayView : Screen("day", R.string.screen_day, Icons.Filled.CalendarViewDay)
@@ -94,8 +113,6 @@ class MainActivity : ComponentActivity() {
                 var displayedDate by remember { mutableStateOf(LocalDate.now()) }
 
                 var currentTopBarTitle by remember { mutableStateOf("") }
-
-                // Форматтеры для заголовков
                 val dayFormatter = remember { DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault()) }
                 val weekFormatterPattern = remember { "w" }
                 val monthFormatter = remember { DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()) }
@@ -207,13 +224,218 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun DayScreen(currentDate: LocalDate, onDateChange: (LocalDate) -> Unit, updateTitle: (LocalDate) -> Unit) {
+fun DayScreen(
+    currentDate: LocalDate,
+    onDateChange: (LocalDate) -> Unit,
+    updateTitle: (LocalDate) -> Unit
+) {
     LaunchedEffect(currentDate) {
         updateTitle(currentDate)
     }
-    // TODO: UI для отображения дня, задач и кнопок < > для смены дня (вызовут onDateChange)
-    Text("Экран Дня: ${currentDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}")
+
+    val dayOfWeekFormatter = remember { DateTimeFormatter.ofPattern("E", Locale.getDefault()) }
+    val dayOfMonthFormatter = remember { DateTimeFormatter.ofPattern("dd", Locale.getDefault()) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            DayScreenHeader(
+                dayOfWeek = currentDate.format(dayOfWeekFormatter).uppercase(),
+                dayOfMonth = currentDate.format(dayOfMonthFormatter),
+                pendingTasksCount = 2
+            )
+
+            HourTimeline(
+                currentDate = currentDate,
+                tasks = emptyList(), /* TODO: Передать реальный список задач */
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        FloatingActionButton(
+            onClick = { /* TODO: Навигация на экран добавления задачи */ },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = "Добавить задачу")
+        }
+    }
 }
+
+@Composable
+fun DayScreenHeader(dayOfWeek: String, dayOfMonth: String, pendingTasksCount: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = dayOfWeek,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = dayOfMonth,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = "$pendingTasksCount ${getPendingTasksString(pendingTasksCount)}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+fun getPendingTasksString(count: Int): String {
+    return when {
+        count % 10 == 1 && count % 100 != 11 -> "ожидающая задача"
+        count % 10 in 2..4 && (count % 100 < 10 || count % 100 >= 20) -> "ожидающие задачи"
+        else -> "ожидающих задач"
+    }
+}
+
+@Composable
+fun HourTimeline(
+    currentDate: LocalDate,
+    tasks: List<Task>,
+    modifier: Modifier = Modifier
+) {
+    val hours = (0..23).toList()
+    val timelineStartPadding = 56.dp
+
+    val lineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+    val currentTimeLineColor = MaterialTheme.colorScheme.primary
+
+    Box(modifier = modifier.fillMaxSize()) {
+        val calculatedHourHeight = 56.dp
+        val calculatedHourHeightPx = with(LocalDensity.current) { calculatedHourHeight.toPx() }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                for (hour in hours) {
+                    val y = hour * calculatedHourHeightPx
+                    drawLine(
+                        color = lineColor,
+                        start = Offset(timelineStartPadding.toPx(), y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1f
+                    )
+                }
+
+                if (currentDate == LocalDate.now()) {
+                    val now = LocalTime.now()
+                    val minutesFromMidnight = now.hour * 60 + now.minute
+                    val currentY = (minutesFromMidnight / (24f * 60f)) * size.height
+
+                    drawLine(
+                        color = currentTimeLineColor,
+                        start = Offset(timelineStartPadding.toPx() - 8.dp.toPx(), currentY),
+                        end = Offset(size.width, currentY),
+                        strokeWidth = 2f
+                    )
+                    drawCircle(
+                        color = currentTimeLineColor,
+                        radius = 4.dp.toPx(),
+                        center = Offset(timelineStartPadding.toPx() - 8.dp.toPx(), currentY)
+                    )
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxSize()) {
+                HourLabelsColumn(
+                    hours = hours,
+                    hourHeight = calculatedHourHeight,
+                    modifier = Modifier.width(timelineStartPadding)
+                )
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    itemsIndexed(hours) { _, hour ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(calculatedHourHeight)
+                        ) {
+                            if (hour == 9 && tasks.isEmpty()) {
+                                TaskEntry(
+                                    title = "Занятия немецким",
+                                    timeRange = "09:00 - 10:00",
+                                    color = Color(0xFF4A90E2),
+                                    modifier = Modifier.padding(start = 4.dp, top = (calculatedHourHeight / 4))
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+@Composable
+fun HourLabelsColumn(
+    hours: List<Int>,
+    hourHeight: Dp,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        hours.forEach { hour ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(hourHeight),
+                contentAlignment = Alignment.TopEnd
+            ) {
+                Text(
+                    text = String.format(Locale.getDefault(), "%02d:00", hour),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TaskEntry(title: String, timeRange: String, color: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(color.copy(alpha = 0.8f), shape = MaterialTheme.shapes.small)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Column {
+            Text(text = title, style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(text = timeRange, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.8f))
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun DayScreenPreview() {
+    MyTimeTheme {
+        DayScreen(LocalDate.now(), {}, {})
+    }
+}
+
+
+const val HOUR_HEIGHT_DP = 60 // Высота одного часа в dp
+val totalDayHeightDp = HOUR_HEIGHT_DP * 24
+
+
 
 @Composable
 fun WeekScreen(currentDate: LocalDate, onDateChange: (LocalDate) -> Unit, updateTitle: (LocalDate) -> Unit) {
@@ -398,3 +620,12 @@ fun DayCell(
         }
     }
 }
+
+data class Task(
+    val id: String,
+    val title: String,
+    val startTime: LocalTime,
+    val endTime: LocalTime,
+    val date: LocalDate, // Дата, к которой относится задача
+    val color: Color // Тип Color из androidx.compose.ui.graphics.Color
+)
