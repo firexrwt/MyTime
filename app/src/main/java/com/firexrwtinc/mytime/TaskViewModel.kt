@@ -11,8 +11,12 @@ import androidx.lifecycle.viewModelScope
 import com.firexrwtinc.mytime.data.database.AppDatabase
 import com.firexrwtinc.mytime.data.model.Task
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.util.Locale
 
 class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -71,6 +75,24 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearSelectedTask() {
         _selectedTask.postValue(null)
+    }
+
+    private val _tasksForWeek = MutableStateFlow<Map<LocalDate, List<Task>>>(emptyMap())
+    val tasksForWeek: StateFlow<Map<LocalDate, List<Task>>> = _tasksForWeek.asStateFlow()
+
+    fun loadTasksForWeek(dateInWeek: LocalDate) {
+        viewModelScope.launch {
+            // Определяем начало и конец недели относительно dateInWeek
+            val firstDayOfWeekDevice = java.time.temporal.WeekFields.of(Locale.getDefault()).firstDayOfWeek
+            val startOfWeek = dateInWeek.with(java.time.temporal.TemporalAdjusters.previousOrSame(firstDayOfWeekDevice))
+            val endOfWeek = startOfWeek.plusDays(6) // Неделя - 7 дней
+
+            // Используем существующий метод из DAO, который принимает LocalDate
+            taskDao.getTasksForDateRange(startOfWeek, endOfWeek).collect { tasks ->
+                // Группируем задачи по дням. Task.date уже является LocalDate.
+                _tasksForWeek.value = tasks.groupBy { task -> task.date }
+            }
+        }
     }
 
     /**

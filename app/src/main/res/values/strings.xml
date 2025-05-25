@@ -1,51 +1,66 @@
 <resources>
     <string name="app_name">MyTime</string>
+    <string name="action_edit">Редактировать</string>
+    <string name="action_delete">Удалить</string>
+    <string name="action_close">Закрыть</string>
+    <string name="action_yes">Да</string>
+    <string name="action_cancel">Отмена</string>
     <string name="title_home">Главная</string>
     <string name="title_dashboard">Панель</string>
     <string name="title_notifications">Уведомления</string>
+    <string name="delete_confirmation_title">Подтверждение</string>
+    <string name="delete_confirmation_message">Вы уверены, что хотите удалить задачу \"%1$s\"?</string>
+    <string name="task_deleted_message">Задача удалена</string>
+    <string name="details_date">Дата: %1$s</string>
+    <string name="details_time">Время: %1$s - %2$s</string>
+    <string name="details_location">Место: %1$s</string>
+    <string name="details_equipment">Оборудование: %1$s</string>
+    <string name="details_price">Цена: %1$s</string>
+    <string name="details_reminder">Напоминание: %1$s</string>
+    <string name="details_color_label">Цвет:</string>
+    <string name="reminder_option_generic_hours">За %1$d ч.</string> <string name="title_edit_task">Редактировать задачу</string>
+    <string name="title_new_task">Новая задача</string>
+
+    <string name="desc_back">Назад</string>
+    <string name="desc_open_drawer">Открыть меню</string>
+    <string name="desc_add_task">Добавить задачу</string>
+    <string name="desc_previous_week">Предыдущая неделя</string>
+    <string name="desc_next_week">Следующая неделя</string>
+    <string name="desc_previous_month">Предыдущий месяц</string>
+    <string name="desc_next_month">Следующий месяц</string>
+    <string name="desc_previous_year">Предыдущий год</string>
+    <string name="desc_next_year">Следующий год</string>
 
     <string name="screen_day">День</string>
     <string name="screen_week">Неделя</string>
     <string name="screen_month">Месяц</string>
     <string name="screen_year">Год</string>
 
-    <string name="desc_open_drawer">Открыть меню навигации</string>
-    <string name="desc_add_task">Добавить задачу</string>
-    <string name="desc_back">Назад</string>
-    <string name="desc_previous_month">Предыдущий месяц</string>
-    <string name="desc_next_month">Следующий месяц</string>
-    <string name="desc_previous_year">Предыдущий год</string>
-    <string name="desc_next_year">Следующий год</string>
-
     <string name="label_task_title">Название задачи</string>
-    <string name="hint_task_title">Введите название</string>
     <string name="label_date">Дата</string>
-    <string name="label_start_time">Время начала</string>
-    <string name="label_end_time">Время окончания</string>
+    <string name="label_start_time">Начало</string>
+    <string name="label_end_time">Конец</string>
     <string name="label_location">Местоположение</string>
-    <string name="hint_location">Введите адрес или выберите на карте</string>
-    <string name="label_equipment">Оборудование</string>
-    <string name="hint_equipment">Список оборудования</string>
-    <string name="label_reminder">Напомнить за</string>
-    <string name="reminder_option_no">Нет напоминания</string>
-    <string name="reminder_option_hours_1">1 час</string>
-    <string name="reminder_option_hours_2">2 часа</string>
-    <string name="reminder_option_hours_3">3 часа</string>
-    <string name="reminder_option_hours_4">4 часа</string>
-    <string name="reminder_option_hours_5">5 часов</string>
-    <string name="reminder_option_hours_6">6 часов</string>
-    <string name="reminder_option_hours_7">7 часов</string>
-    <string name="reminder_option_hours_8">8 часов</string>
-    <string name="reminder_option_hours_9">9 часов</string>
-    <string name="label_price">Цена</string>
-    <string name="hint_price">Введите цену</string>
+    <string name="hint_location">Например, офис, дом</string>
+    <string name="label_equipment">Оборудование/Заметки</string>
+    <string name="hint_equipment">Например, ноутбук, проектор</string>
+    <string name="label_price">Стоимость</string>
+    <string name="hint_price">0.00</string>
+    <string name="label_reminder">Напомнить</string>
     <string name="label_task_color">Цвет задачи</string>
-    <string name="button_save_task">Сохранить</string>
-    <string name="dialog_title_select_date">Выберите дату</string>
-    <string name="dialog_title_select_time">Выберите время</string>
-    <string name="dialog_ok">OK</string>
-    <string name="dialog_cancel">Отмена</string>
-    <string name="error_title_empty">Название задачи не может быть пустым</string>
-    <string name="error_end_time_before_start">Время окончания не может быть раньше времени начала</string>
+    <string name="button_save_task">Сохранить задачу</string>
 
+    <string name="error_title_empty">Название задачи не может быть пустым.</string>
+    <string name="error_end_time_before_start">Время окончания не может быть раньше времени начала.</string>
+
+    <string name="reminder_option_no">Нет</string>
+    <string name="reminder_option_hours_1">За 1 час</string>
+    <string name="reminder_option_hours_2">За 2 часа</string>
+    <string name="reminder_option_hours_3">За 3 часа</string>
+    <string name="reminder_option_hours_4">За 4 часа</string>
+    <string name="reminder_option_hours_5">За 5 часов</string>
+    <string name="reminder_option_hours_6">За 6 часов</string>
+    <string name="reminder_option_hours_7">За 7 часов</string>
+    <string name="reminder_option_hours_8">За 8 часов</string>
+    <string name="reminder_option_hours_9">За 9 часов</string>
 </resources>
