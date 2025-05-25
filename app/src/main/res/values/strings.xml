@@ -20,7 +20,8 @@
     <string name="details_color_label">Цвет:</string>
     <string name="reminder_option_generic_hours">За %1$d ч.</string> <string name="title_edit_task">Редактировать задачу</string>
     <string name="title_new_task">Новая задача</string>
-
+    <string name="desc_previous_day">Предыдущий день</string>
+    <string name="desc_next_day">Следующий день</string>
     <string name="desc_back">Назад</string>
     <string name="desc_open_drawer">Открыть меню</string>
     <string name="desc_add_task">Добавить задачу</string>
@@ -30,12 +31,10 @@
     <string name="desc_next_month">Следующий месяц</string>
     <string name="desc_previous_year">Предыдущий год</string>
     <string name="desc_next_year">Следующий год</string>
-
     <string name="screen_day">День</string>
     <string name="screen_week">Неделя</string>
     <string name="screen_month">Месяц</string>
     <string name="screen_year">Год</string>
-
     <string name="label_task_title">Название задачи</string>
     <string name="label_date">Дата</string>
     <string name="label_start_time">Начало</string>
@@ -49,10 +48,8 @@
     <string name="label_reminder">Напомнить</string>
     <string name="label_task_color">Цвет задачи</string>
     <string name="button_save_task">Сохранить задачу</string>
-
     <string name="error_title_empty">Название задачи не может быть пустым.</string>
     <string name="error_end_time_before_start">Время окончания не может быть раньше времени начала.</string>
-
     <string name="reminder_option_no">Нет</string>
     <string name="reminder_option_hours_1">За 1 час</string>
     <string name="reminder_option_hours_2">За 2 часа</string>

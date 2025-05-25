@@ -1,5 +1,6 @@
 package com.firexrwtinc.mytime
 
+// import androidx.compose.runtime.livedata.observeAsState // Заменяем на collectAsStateWithLifecycle для Flow
 import android.annotation.SuppressLint
 import android.app.Application
 import android.os.Bundle
@@ -66,7 +67,6 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -85,7 +85,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -106,14 +105,12 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
-import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToInt
 import java.time.format.TextStyle as JavaTextStyle
 
-/* TODO: Доделать WeekScreen
-* TODO: Сделать переключение на следующий день в DayScreen
-* TODO: При двойном нажатии на день в Month или WeekScreen открыть DayScreen соответствующего дня(в соответствии с логикой YearScreen)
+/* TODO: Сделать переключение на следующий день в DayScreen - В процессе
+* TODO: При двойном нажатии на день в Month или WeekScreen открыть DayScreen соответствующего дня(в соответствии с логикой YearScreen) - В процессе
 * TODO: Надо сделать везде красивые анимации
 * TODO: Надо сделать возможность создания шаблонов для задач
 * TODO: Надо сделать возможность редактирования шаблонов
@@ -192,18 +189,18 @@ class MainActivity : ComponentActivity() {
 
                             topBarTitleFormatted = if (startOfWeek.year == endOfWeek.year) {
                                 if (startOfWeek.month == endOfWeek.month) {
-                                    "${startOfWeek.dayOfMonth} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMMM yyyy"))} (Н $weekNumber)"
+                                    "${startOfWeek.dayOfMonth} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMMM yy"))} (Н $weekNumber)"
                                 } else {
-                                    "${startOfWeek.format(DateTimeFormatter.ofPattern("d MMM"))} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMMM yyyy"))} (Н $weekNumber)"
+                                    "${startOfWeek.format(DateTimeFormatter.ofPattern("d MMM"))} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMMM yy"))} (Н $weekNumber)"
                                 }
                             } else {
-                                "${startOfWeek.format(DateTimeFormatter.ofPattern("d MMM yyyy"))} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMM yyyy"))} (Н $weekNumber)"
+                                "${startOfWeek.format(DateTimeFormatter.ofPattern("d MMM yy"))} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMM yy"))} (Н $weekNumber)"
                             }
                         }
                         is Screen.MonthView -> topBarTitleFormatted = YearMonth.from(date).format(monthFormatter)
                         is Screen.YearView -> topBarTitleFormatted = date.format(yearFormatter)
                         is Screen.CreateTask -> {
-                            val editingTask = taskViewModel.selectedTask.value
+                            val editingTask = taskViewModel.selectedTask.value // ObserveAsState не нужен здесь
                             topBarTitleStringRes = if (editingTask != null && editingTask.id != 0L) {
                                 R.string.title_edit_task
                             } else {
@@ -321,14 +318,16 @@ fun AppNavHost(
                 currentDate = displayedDate,
                 onDateChange = onDateChange,
                 updateTitle = { date -> updateTitle(Screen.WeekView, date) },
-                taskViewModel = taskViewModel
+                taskViewModel = taskViewModel,
+                navController = navController
             )
         }
         composable(Screen.MonthView.route) {
             MonthScreen(
                 currentDate = displayedDate,
                 onDateChange = onDateChange,
-                updateTitle = { date -> updateTitle(Screen.MonthView, date) }
+                updateTitle = { date -> updateTitle(Screen.MonthView, date) },
+                navController = navController
             )
         }
         composable(Screen.YearView.route) {
@@ -373,7 +372,7 @@ fun TaskDetailDialog(task: Task, onDismiss: () -> Unit) {
         title = { Text(task.title, style = MaterialTheme.typography.headlineSmall) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.details_date, task.date.format(DateTimeFormatter.ofPattern("d MMMM yyyy"))))
+                Text(stringResource(R.string.details_date, task.date.format(DateTimeFormatter.ofPattern("d MMMM uuuu"))))
                 Text(stringResource(R.string.details_time, task.startTime.format(timeFormatter), task.endTime?.format(timeFormatter) ?: "-"))
                 task.location?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.details_location, it)) }
                 task.equipment?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.details_equipment, it)) }
@@ -410,38 +409,58 @@ fun DayScreen(
     navController: NavHostController,
     snackbarHostState: SnackbarHostState
 ) {
+    // Используем LaunchedEffect для вызова setCurrentDayForObserver при изменении currentDate
     LaunchedEffect(currentDate) {
         updateTitle(currentDate)
-        taskViewModel.loadTasksForDate(currentDate)
+        taskViewModel.setCurrentDayForObserver(currentDate) // Обновляем дату в ViewModel
     }
-    val tasksForDay: List<Task> by taskViewModel.tasksForDateLiveData.observeAsState(initial = emptyList())
+
+    // Собираем задачи из StateFlow
+    val tasksForDay: List<Task> by taskViewModel.tasksForDateFlow.collectAsStateWithLifecycle()
+
     val dayOfWeekFormatter = remember { DateTimeFormatter.ofPattern("E", Locale.getDefault()) }
     val dayOfMonthFormatter = remember { DateTimeFormatter.ofPattern("dd", Locale.getDefault()) }
 
     var showTaskDetailDialog by remember { mutableStateOf<Task?>(null) }
     var showDeleteConfirmDialog by remember { mutableStateOf<Task?>(null) }
     var showContextMenu by remember { mutableStateOf<Task?>(null) }
-    var contextMenuPosition by remember { mutableStateOf(DpOffset.Zero) } // Используется для DropdownMenu
-
-    val localDensity = LocalDensity.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            DayScreenHeader(
-                dayOfWeek = currentDate.format(dayOfWeekFormatter).uppercase(Locale.getDefault()),
-                dayOfMonth = currentDate.format(dayOfMonthFormatter),
-                pendingTasksCount = tasksForDay.count { task -> !task.isCompleted && task.endTime?.isAfter(LocalTime.now()) ?: false }
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = { onDateChange(currentDate.minusDays(1)) }) {
+                    Icon(Icons.Filled.ArrowBackIosNew, contentDescription = stringResource(R.string.desc_previous_day))
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = currentDate.format(dayOfWeekFormatter).uppercase(Locale.getDefault()),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = currentDate.format(dayOfMonthFormatter),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                IconButton(onClick = { onDateChange(currentDate.plusDays(1)) }) {
+                    Icon(Icons.Filled.ArrowForwardIos, contentDescription = stringResource(R.string.desc_next_day))
+                }
+            }
             HourTimeline(
                 currentDate = currentDate,
                 tasks = tasksForDay,
                 modifier = Modifier.weight(1f),
                 onTaskClick = { task -> showTaskDetailDialog = task },
-                onTaskLongClick = { task -> // Изменено: onTaskLongClick теперь не принимает Offset
+                onTaskLongClick = { task ->
                     showContextMenu = task
-                    // Позиционирование DropdownMenu теперь будет стандартным,
-                    // или потребует другого подхода (например, onGloballyPositioned)
-                    // contextMenuPosition = DpOffset.Zero // Можно оставить или убрать, если не используется
                 }
             )
         }
@@ -458,13 +477,9 @@ fun DayScreen(
     }
 
     showContextMenu?.let { task ->
-        // Для позиционирования DropdownMenu можно обернуть его в Box
-        // и использовать Modifier.offset для установки позиции, если это необходимо.
-        // Пока что используем стандартное позиционирование.
         DropdownMenu(
-            expanded = true, // showContextMenu != null означает, что меню должно быть видимо
+            expanded = true,
             onDismissRequest = { showContextMenu = null }
-            // offset = contextMenuPosition  // Убрано, т.к. offset из combinedClickable не доступен
         ) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.action_edit)) },
@@ -512,22 +527,6 @@ fun DayScreen(
     }
 }
 
-@Composable
-fun DayScreenHeader(dayOfWeek: String, dayOfMonth: String, pendingTasksCount: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = dayOfWeek, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = dayOfMonth, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.weight(1f))
-        Text(text = "$pendingTasksCount ${getPendingTasksString(pendingTasksCount)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
 fun getPendingTasksString(count: Int): String {
     return when {
         count % 10 == 1 && count % 100 != 11 -> "ожидающая задача"
@@ -543,7 +542,7 @@ fun HourTimeline(
     tasks: List<Task>,
     modifier: Modifier = Modifier,
     onTaskClick: (Task) -> Unit,
-    onTaskLongClick: (Task) -> Unit // Изменено: не принимает Offset
+    onTaskLongClick: (Task) -> Unit
 ) {
     var scaleFactor by remember { mutableStateOf(1f) }
     val scaledHourHeight = remember(scaleFactor) {
@@ -648,7 +647,7 @@ fun HourTimeline(
                                     .fillMaxWidth()
                                     .combinedClickable(
                                         onClick = { onTaskClick(task) },
-                                        onLongClick = { onTaskLongClick(task) } // Изменено: не передаем Offset
+                                        onLongClick = { onTaskLongClick(task) }
                                     )
                             )
                         }
@@ -733,13 +732,14 @@ fun DayScreenPreview() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun WeekScreen(
     currentDate: LocalDate,
     onDateChange: (LocalDate) -> Unit,
     updateTitle: (LocalDate) -> Unit,
-    taskViewModel: TaskViewModel
+    taskViewModel: TaskViewModel,
+    navController: NavHostController
 ) {
     LaunchedEffect(currentDate) {
         updateTitle(currentDate)
@@ -795,19 +795,28 @@ fun WeekScreen(
                     date = day,
                     tasks = tasksForThisDay,
                     isToday = (day == LocalDate.now()),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onDoubleClick = { selectedDate ->
+                        onDateChange(selectedDate)
+                        navController.navigate(Screen.DayView.route) {
+                            popUpTo(navController.graph.findStartDestination().id)
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DayColumnForWeek(
     date: LocalDate,
     tasks: List<Task>,
     isToday: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDoubleClick: (LocalDate) -> Unit
 ) {
     val dayNumberFormatter = remember { DateTimeFormatter.ofPattern("d", Locale.getDefault()) }
 
@@ -826,7 +835,11 @@ fun DayColumnForWeek(
                 else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                 shape = MaterialTheme.shapes.small
             )
-            .padding(all = 4.dp),
+            .padding(all = 4.dp)
+            .combinedClickable(
+                onClick = { /* Одинарный клик пока ничего не делает */ },
+                onDoubleClick = { onDoubleClick(date) }
+            ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -867,8 +880,14 @@ fun TaskItemWeek(task: Task) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MonthScreen(currentDate: LocalDate, onDateChange: (LocalDate) -> Unit, updateTitle: (LocalDate) -> Unit) {
+fun MonthScreen(
+    currentDate: LocalDate,
+    onDateChange: (LocalDate) -> Unit,
+    updateTitle: (LocalDate) -> Unit,
+    navController: NavHostController
+) {
     val currentYearMonth = remember(currentDate) { YearMonth.from(currentDate) }
     LaunchedEffect(currentYearMonth) { updateTitle(currentYearMonth.atDay(1)) }
     val daysOfWeek = remember { getDaysOfWeek() }
@@ -884,8 +903,24 @@ fun MonthScreen(currentDate: LocalDate, onDateChange: (LocalDate) -> Unit, updat
         LazyVerticalGrid(columns = GridCells.Fixed(7), modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
             items(calendarDays.size) { index ->
                 val date = calendarDays[index]
-                DayCell(date = date, isCurrentMonth = date?.month == currentYearMonth.month, isToday = date == LocalDate.now(),
-                    onClick = { if (date != null) { onDateChange(date) } }
+                DayCell(
+                    date = date,
+                    isCurrentMonth = date?.month == currentYearMonth.month,
+                    isToday = date == LocalDate.now(),
+                    onClick = { clickedDate ->
+                        if (clickedDate != null) {
+                            onDateChange(clickedDate)
+                        }
+                    },
+                    onDoubleClick = { doubleClickedDate ->
+                        if (doubleClickedDate != null) {
+                            onDateChange(doubleClickedDate)
+                            navController.navigate(Screen.DayView.route) {
+                                popUpTo(navController.graph.findStartDestination().id)
+                                launchSingleTop = true
+                            }
+                        }
+                    }
                 )
             }
         }
@@ -963,13 +998,24 @@ fun MonthNavigationHeader(currentYearMonth: YearMonth, onPreviousMonth: () -> Un
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun DayCell(date: LocalDate?, isCurrentMonth: Boolean, isToday: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun DayCell(
+    date: LocalDate?,
+    isCurrentMonth: Boolean,
+    isToday: Boolean,
+    onClick: (LocalDate?) -> Unit,
+    onDoubleClick: (LocalDate?) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Box(
         modifier = modifier
             .aspectRatio(1f)
             .padding(1.dp)
-            .clickable(enabled = date != null, onClick = onClick)
+            .combinedClickable(
+                onClick = { onClick(date) },
+                onDoubleClick = { if (date != null) onDoubleClick(date) }
+            )
             .then(
                 if (date != null && isToday) Modifier
                     .border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium)
