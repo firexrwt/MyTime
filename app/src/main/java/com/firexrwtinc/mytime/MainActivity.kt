@@ -1,11 +1,10 @@
 package com.firexrwtinc.mytime
 
 import android.annotation.SuppressLint
-import android.app.Application // Необходим для TaskViewModelFactory
+import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-// import androidx.activity.viewModels // Этот импорт больше не нужен, используем viewModel() из compose
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -59,7 +58,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost // Импорт для SnackbarHost
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -89,7 +88,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel // Для получения ViewModel в Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -98,7 +97,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.firexrwtinc.mytime.data.model.Task
-import com.firexrwtinc.mytime.ui.CreateTaskScreen // Убедитесь, что этот файл создан и импорт корректен
+import com.firexrwtinc.mytime.ui.CreateTaskScreen
 import com.firexrwtinc.mytime.ui.TaskViewModel
 import com.firexrwtinc.mytime.ui.theme.MyTimeTheme
 import kotlinx.coroutines.launch
