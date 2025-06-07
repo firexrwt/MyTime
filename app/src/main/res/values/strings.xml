@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">MyTime</string>
+    <string name="app_name">My Time</string>
     <string name="action_edit">Редактировать</string>
     <string name="action_delete">Удалить</string>
     <string name="action_close">Закрыть</string>
@@ -18,7 +18,8 @@
     <string name="details_price">Цена: %1$s</string>
     <string name="details_reminder">Напоминание: %1$s</string>
     <string name="details_color_label">Цвет:</string>
-    <string name="reminder_option_generic_hours">За %1$d ч.</string> <string name="title_edit_task">Редактировать задачу</string>
+    <string name="reminder_option_generic_hours">За %1$d ч.</string>
+    <string name="title_edit_task">Редактировать задачу</string>
     <string name="title_new_task">Новая задача</string>
     <string name="desc_previous_day">Предыдущий день</string>
     <string name="desc_next_day">Следующий день</string>
