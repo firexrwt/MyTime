@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.EuroSymbol
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.outlined.ListAlt
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Title
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,12 +44,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -93,6 +98,7 @@ fun CreateTaskScreen(
     var taskPriceString by remember { mutableStateOf("") }
     var selectedReminderHours by remember { mutableStateOf<Int?>(null) }
     var selectedColorHex by remember { mutableStateOf("#82B1FF") } // Default Blue A100
+    var showColorPicker by remember { mutableStateOf(false) }
 
     val isEditing = taskIdToEdit != 0L
     val existingTaskState by taskViewModel.selectedTask.observeAsState()
@@ -315,12 +321,13 @@ fun CreateTaskScreen(
                 value = taskEquipment,
                 onValueChange = { taskEquipment = it },
                 label = { Text(stringResource(R.string.label_equipment)) },
-                leadingIcon = { Icon(Icons.Outlined.ListAlt, contentDescription = null)},
+                leadingIcon = { Icon(Icons.Outlined.ListAlt, contentDescription = null) },
                 placeholder = { Text(stringResource(R.string.hint_equipment)) },
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                minLines = 2,
+                maxLines = 5
                 // TODO: Implement equipment presets loading and management
-                // TODO: Implement resizable input field for task description/equipment
             )
 
             OutlinedTextField(
@@ -391,7 +398,21 @@ fun CreateTaskScreen(
                     }
                 }
             }
-            // TODO: Добавить более продвинутый Color Picker, если нужно
+            Button(onClick = { showColorPicker = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Icon(Icons.Filled.ColorLens, contentDescription = null)
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.button_custom_color))
+            }
+
+            if (showColorPicker) {
+                ColorPickerDialog(
+                    initialColor = hexToColor(selectedColorHex),
+                    onColorSelected = {
+                        selectedColorHex = String.format("#%06X", 0xFFFFFF and it.toArgb())
+                    },
+                    onDismiss = { showColorPicker = false }
+                )
+            }
 
             Spacer(modifier = Modifier.height(72.dp)) // Отступ для плавающей кнопки сохранения
         }
@@ -432,4 +453,50 @@ fun Color.luminance(): Float {
     val green = android.graphics.Color.green(colorInt) / 255f
     val blue = android.graphics.Color.blue(colorInt) / 255f
     return (0.2126f * red + 0.7152f * green + 0.0722f * blue)
+}
+
+@Composable
+fun ColorPickerDialog(
+    initialColor: Color,
+    onColorSelected: (Color) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var hue by remember { mutableFloatStateOf(0f) }
+    val hsv = remember { FloatArray(3) }
+    LaunchedEffect(initialColor) {
+        android.graphics.Color.colorToHSV(initialColor.toArgb(), hsv)
+        hue = hsv[0]
+    }
+    val previewColor = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { onColorSelected(previewColor) }) {
+                Text(stringResource(id = R.string.action_yes))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(id = R.string.action_cancel))
+            }
+        },
+        title = { Text(stringResource(R.string.title_color_picker)) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(previewColor)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                )
+                Slider(
+                    value = hue,
+                    onValueChange = { hue = it },
+                    valueRange = 0f..360f
+                )
+            }
+        }
+    )
 }

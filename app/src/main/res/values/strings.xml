@@ -64,4 +64,7 @@
     <string name="menu_settings">Настройки</string>
     <string name="screen_settings">Настройки</string>
     <string name="desc_open_settings">Открыть настройки</string>
+    <string name="button_custom_color">Другой цвет</string>
+    <string name="title_color_picker">Выбор цвета</string>
 </resources>
+
