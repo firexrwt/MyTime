@@ -504,6 +504,7 @@ fun DayScreen(
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.action_edit)) },
                 onClick = {
+                        taskViewModel.setCurrentDayForObserver(currentDate)
                     navController.navigate(Screen.CreateTask.route + "?taskId=${task.id}&date=${task.date}")
                     showContextMenu = null
                 },
