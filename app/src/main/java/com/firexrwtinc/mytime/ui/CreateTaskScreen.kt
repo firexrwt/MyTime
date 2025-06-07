@@ -93,6 +93,7 @@ fun CreateTaskScreen(
     var taskDate by remember { mutableStateOf(selectedDateArg) }
     var taskStartTime by remember { mutableStateOf(LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(1)) }
     var taskEndTime by remember { mutableStateOf(LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(2)) }
+    var endTimeManuallyChanged by remember { mutableStateOf(false) }
     var taskLocation by remember { mutableStateOf("") }
     var taskEquipment by remember { mutableStateOf("") }
     var taskPriceString by remember { mutableStateOf("") }
@@ -119,6 +120,7 @@ fun CreateTaskScreen(
             taskPriceString = ""
             selectedReminderHours = null
             selectedColorHex = "#82B1FF"
+            endTimeManuallyChanged = false
             taskViewModel.clearSelectedTask() // Очищаем selectedTask во ViewModel
         }
     }
@@ -137,6 +139,7 @@ fun CreateTaskScreen(
                 taskPriceString = task.price?.toString() ?: ""
                 selectedReminderHours = task.reminderHoursBefore
                 selectedColorHex = task.colorHex
+                endTimeManuallyChanged = true
             }
         }
     }
@@ -159,6 +162,9 @@ fun CreateTaskScreen(
         context,
         { _, hourOfDay: Int, minute: Int ->
             taskStartTime = LocalTime.of(hourOfDay, minute)
+            if (!endTimeManuallyChanged || !taskEndTime.isAfter(taskStartTime)) {
+                taskEndTime = taskStartTime.plusHours(1)
+            }
         },
         taskStartTime.hour,
         taskStartTime.minute,
@@ -169,6 +175,7 @@ fun CreateTaskScreen(
         context,
         { _, hourOfDay: Int, minute: Int ->
             taskEndTime = LocalTime.of(hourOfDay, minute)
+            endTimeManuallyChanged = true
         },
         taskEndTime.hour,
         taskEndTime.minute,
