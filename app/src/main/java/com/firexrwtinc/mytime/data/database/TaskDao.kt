@@ -33,5 +33,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC, startTime ASC")
     fun getTasksForDateRange(startDate: LocalDate, endDate: LocalDate): Flow<List<Task>>
 
-    // TODO: Добавить методы для поиска задач, фильтрации по статусу и т.д.
+    /**
+     * Возвращает задачи в зависимости от статуса выполнения.
+     */
+    @Query("SELECT * FROM tasks WHERE isCompleted = :isCompleted ORDER BY date ASC, startTime ASC")
+    fun getTasksByCompletion(isCompleted: Boolean): Flow<List<Task>>
 }
