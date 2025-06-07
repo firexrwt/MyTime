@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.CalendarViewWeek
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DrawerValue
@@ -109,18 +110,14 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import java.time.format.TextStyle as JavaTextStyle
 
-/* TODO: Сделать переключение на следующий день в DayScreen - В процессе
-* TODO: При двойном нажатии на день в Month или WeekScreen открыть DayScreen соответствующего дня(в соответствии с логикой YearScreen) - В процессе
-* TODO: Надо сделать везде красивые анимации
-* TODO: Надо сделать возможность создания шаблонов для задач
-* TODO: Надо сделать возможность редактирования шаблонов
-* TODO: Надо сделать возможность удаления шаблонов
-* TODO: Надо сделать возможность для загрузки шаблонов на странице создания задач
-* TODO: Надо сделать интеграцию с базой данных(для шаблонов и самих задач)
-* TODO: Надо сделать логику для уведомлений за час до будильника(будильник должен звонить от 0 до 9 часов до задачи в зависимости от выбора пользователя на экране создания задач)
-* TODO: Добавить опцию редактирования уже существующих задач
-* TODO: Надо сделать опцию удаления существующих задач
-* TODO: Надо сделать настройки в сэндвич меню */
+/* TODO: Надо сделать везде красивые анимации
+ * TODO: Надо сделать возможность создания шаблонов для задач
+ * TODO: Надо сделать возможность редактирования шаблонов
+ * TODO: Надо сделать возможность удаления шаблонов
+ * TODO: Надо сделать возможность для загрузки шаблонов на странице создания задач
+ * TODO: Надо сделать интеграцию с базой данных(для шаблонов и самих задач)
+ * TODO: Надо сделать логику для уведомлений за час до будильника(будильник должен звонить от 0 до 9 часов до задачи в зависимости от выбора пользователя на экране создания задач)
+ */
 
 fun hexToColor(hex: String): Color {
     val colorString = if (hex.startsWith("#")) hex else "#$hex"
@@ -137,6 +134,7 @@ sealed class Screen(val route: String, val resourceId: Int? = null, val icon: Im
     object MonthView : Screen("month", R.string.screen_month, Icons.Filled.CalendarMonth)
     object YearView : Screen("year", R.string.screen_year, Icons.Filled.CalendarToday)
     object CreateTask : Screen("create_task")
+    object Settings : Screen("settings", R.string.screen_settings, Icons.Filled.Settings)
 }
 
 val navItems = listOf(
@@ -207,23 +205,38 @@ class MainActivity : ComponentActivity() {
                                 R.string.title_new_task
                             }
                         }
+                        is Screen.Settings -> {
+                            topBarTitleStringRes = R.string.screen_settings
+                        }
                     }
                 }
 
                 LaunchedEffect(navController.currentBackStackEntryAsState().value, displayedDate, taskViewModel.selectedTask.value) {
                     val currentRoute = navController.currentBackStackEntry?.destination?.route
-                    val screenForTitleUpdate = if (currentRoute?.startsWith(Screen.CreateTask.route.split("?").first()) == true) {
-                        Screen.CreateTask
-                    } else {
-                        navItems.find { it.route == currentRoute } ?: Screen.DayView
+                    val screenForTitleUpdate = when {
+                        currentRoute?.startsWith(Screen.CreateTask.route.split("?").first()) == true -> Screen.CreateTask
+                        currentRoute == Screen.Settings.route -> Screen.Settings
+                        else -> navItems.find { it.route == currentRoute } ?: Screen.DayView
                     }
                     updateTitle(screenForTitleUpdate, displayedDate)
                 }
 
-                ModalNavigationDrawer(drawerState = drawerState, drawerContent = { ModalDrawerSheet {
-                    Text("Элемент меню 1 (пример)", modifier = Modifier.padding(16.dp))
-                    Text("Элемент меню 2 (пример)", modifier = Modifier.padding(16.dp))
-                } }) {
+                ModalNavigationDrawer(drawerState = drawerState, drawerContent = {
+                    ModalDrawerSheet {
+                        Text(
+                            stringResource(R.string.menu_settings),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    scope.launch { drawerState.close() }
+                                    navController.navigate(Screen.Settings.route) {
+                                        launchSingleTop = true
+                                    }
+                                }
+                                .padding(16.dp)
+                        )
+                    }
+                }) {
                     Scaffold(
                         snackbarHost = { SnackbarHost(snackbarHostState) },
                         topBar = {
@@ -361,6 +374,9 @@ fun AppNavHost(
                 selectedDateArg = selectedDate,
                 taskIdToEdit = taskId
             )
+        }
+        composable(Screen.Settings.route) {
+            SettingsScreen()
         }
     }
 }
@@ -962,6 +978,18 @@ fun MonthCellForYearView(yearMonth: YearMonth, monthName: String, isCurrentMonth
         contentAlignment = Alignment.Center
     ) {
         Text(text = monthName, style = MaterialTheme.typography.bodyLarge, fontWeight = if (isCurrentMonth) FontWeight.Bold else FontWeight.Normal, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+fun SettingsScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = stringResource(R.string.menu_settings))
     }
 }
 

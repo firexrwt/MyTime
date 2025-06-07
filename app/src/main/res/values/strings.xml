@@ -61,4 +61,7 @@
     <string name="reminder_option_hours_7">За 7 часов</string>
     <string name="reminder_option_hours_8">За 8 часов</string>
     <string name="reminder_option_hours_9">За 9 часов</string>
+    <string name="menu_settings">Настройки</string>
+    <string name="screen_settings">Настройки</string>
+    <string name="desc_open_settings">Открыть настройки</string>
 </resources>
