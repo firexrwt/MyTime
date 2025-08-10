@@ -3,6 +3,7 @@ package com.firexrwtinc.mytime
 // import androidx.compose.runtime.livedata.observeAsState // Заменяем на collectAsStateWithLifecycle для Flow
 import android.annotation.SuppressLint
 import android.app.Application
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -44,6 +45,7 @@ import androidx.compose.material.icons.filled.CalendarViewWeek
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -96,10 +98,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
 import com.firexrwtinc.mytime.data.model.Task
 import com.firexrwtinc.mytime.ui.CreateTaskScreen
 import com.firexrwtinc.mytime.ui.TaskViewModel
+import com.firexrwtinc.mytime.ui.settings.SettingsScreen
+import com.firexrwtinc.mytime.ui.settings.SettingsViewModel
+import com.firexrwtinc.mytime.ui.templates.TaskTemplatesScreen
+import com.firexrwtinc.mytime.ui.templates.CreateEditTemplateScreen
 import com.firexrwtinc.mytime.ui.theme.MyTimeTheme
+import com.firexrwtinc.mytime.ui.theme.UserAwareTheme
+import com.firexrwtinc.mytime.utils.NavigationUtils
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -139,6 +149,11 @@ sealed class Screen(val route: String, val resourceId: Int? = null, val icon: Im
     object YearView : Screen("year", R.string.screen_year, Icons.Filled.CalendarToday)
     object CreateTask : Screen("create_task")
     object Settings : Screen("settings", R.string.screen_settings, Icons.Filled.Settings)
+    object Templates : Screen("templates")
+    object CreateTemplate : Screen("create_template")
+    object EditTemplate : Screen("edit_template/{templateId}") {
+        fun createRoute(templateId: Long) = "edit_template/$templateId"
+    }
 }
 
 val navItems = listOf(
@@ -158,8 +173,21 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Запускаем foreground service для работы в фоне
+        val serviceIntent = Intent(this, com.firexrwtinc.mytime.notifications.ForegroundService::class.java)
+        startForegroundService(serviceIntent)
+        
         setContent {
-            MyTimeTheme {
+            val settingsViewModel: SettingsViewModel = viewModel()
+            val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+            
+            // Инициализируем настройки при первом запуске
+            LaunchedEffect(Unit) {
+                settingsViewModel.initializeSettings()
+            }
+            
+            UserAwareTheme(settings = settings) {
                 val navController = rememberNavController()
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -212,6 +240,15 @@ class MainActivity : ComponentActivity() {
                         is Screen.Settings -> {
                             topBarTitleStringRes = R.string.screen_settings
                         }
+                        is Screen.Templates -> {
+                            topBarTitleFormatted = "Шаблоны задач"
+                        }
+                        is Screen.CreateTemplate -> {
+                            topBarTitleFormatted = "Создать шаблон"
+                        }
+                        is Screen.EditTemplate -> {
+                            topBarTitleFormatted = "Редактировать шаблон"
+                        }
                     }
                 }
 
@@ -220,6 +257,9 @@ class MainActivity : ComponentActivity() {
                     val screenForTitleUpdate = when {
                         currentRoute?.startsWith(Screen.CreateTask.route.split("?").first()) == true -> Screen.CreateTask
                         currentRoute == Screen.Settings.route -> Screen.Settings
+                        currentRoute == Screen.Templates.route -> Screen.Templates
+                        currentRoute == Screen.CreateTemplate.route -> Screen.CreateTemplate
+                        currentRoute?.startsWith("edit_template/") == true -> Screen.EditTemplate
                         else -> navItems.find { it.route == currentRoute } ?: Screen.DayView
                     }
                     updateTitle(screenForTitleUpdate, displayedDate)
@@ -227,6 +267,18 @@ class MainActivity : ComponentActivity() {
 
                 ModalNavigationDrawer(drawerState = drawerState, drawerContent = {
                     ModalDrawerSheet {
+                        Text(
+                            "Шаблоны задач",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    scope.launch { drawerState.close() }
+                                    navController.navigate(Screen.Templates.route) {
+                                        launchSingleTop = true
+                                    }
+                                }
+                                .padding(16.dp)
+                        )
                         Text(
                             stringResource(R.string.menu_settings),
                             modifier = Modifier
@@ -380,13 +432,42 @@ fun AppNavHost(
             )
         }
         composable(Screen.Settings.route) {
-            SettingsScreen()
+            SettingsScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.Templates.route) {
+            TaskTemplatesScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToCreateTemplate = { navController.navigate(Screen.CreateTemplate.route) },
+                onNavigateToEditTemplate = { templateId ->
+                    navController.navigate(Screen.EditTemplate.createRoute(templateId))
+                }
+            )
+        }
+        composable(Screen.CreateTemplate.route) {
+            CreateEditTemplateScreen(
+                templateId = null,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = Screen.EditTemplate.route,
+            arguments = listOf(navArgument("templateId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val templateId = backStackEntry.arguments?.getLong("templateId") ?: 0L
+            CreateEditTemplateScreen(
+                templateId = templateId,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }
 @Composable
 fun TaskDetailDialog(task: Task, onDismiss: () -> Unit) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val context = LocalContext.current
+    
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(task.title, style = MaterialTheme.typography.headlineSmall) },
@@ -394,7 +475,35 @@ fun TaskDetailDialog(task: Task, onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.details_date, task.date.format(DateTimeFormatter.ofPattern("d MMMM uuuu"))))
                 Text(stringResource(R.string.details_time, task.startTime.format(timeFormatter), task.endTime?.format(timeFormatter) ?: "-"))
-                task.location?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.details_location, it)) }
+                
+                // Location with navigation button
+                task.location?.takeIf { it.isNotBlank() }?.let { location ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            stringResource(R.string.details_location, location),
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = { 
+                                if (task.locationLatitude != null && task.locationLongitude != null) {
+                                    NavigationUtils.navigateToCoordinates(context, task.locationLatitude!!, task.locationLongitude!!, location)
+                                } else {
+                                    NavigationUtils.navigateToLocation(context, location)
+                                }
+                            }
+                        ) {
+                            Icon(
+                                Icons.Filled.Navigation,
+                                contentDescription = "Навигация к месту",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+                
                 task.equipment?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.details_equipment, it)) }
                 task.price?.let { Text(stringResource(R.string.details_price, String.format(Locale.ROOT, "%.2f", it))) }
                 task.reminderHoursBefore?.let {
@@ -486,9 +595,14 @@ fun DayScreen(
         }
         FloatingActionButton(
             onClick = { navController.navigate(Screen.CreateTask.route + "?date=${currentDate}&taskId=0") },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
         ) {
-            Icon(Icons.Filled.Add, stringResource(id = R.string.desc_add_task))
+            Icon(
+                imageVector = Icons.Filled.Add, 
+                contentDescription = "Добавить задачу"
+            )
         }
     }
 

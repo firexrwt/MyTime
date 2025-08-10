@@ -10,15 +10,18 @@ data class Task(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     var title: String,
+    var description: String = "",
     var date: LocalDate,
     var startTime: LocalTime,
     var endTime: LocalTime,
     var location: String? = null,
+    var locationLatitude: Double? = null,
+    var locationLongitude: Double? = null,
     var equipment: String? = null,
     var reminderHoursBefore: Int? = null,
     var price: Double? = null,
     var colorHex: String,
-    var isCompleted: Boolean = false
-    // TODO: Рассмотреть добавление поля для описания задачи (если одного title мало)
-    // TODO: Рассмотреть добавление поля для повторяющихся задач
+    var isCompleted: Boolean = false,
+    var recurrenceType: RecurrenceType = RecurrenceType.NONE,
+    var recurrenceEndDate: LocalDate? = null
 )

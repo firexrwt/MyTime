@@ -20,11 +20,15 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.Locale
+import com.firexrwtinc.mytime.notifications.AlarmManagerHelper
+import com.firexrwtinc.mytime.notifications.NotificationScheduler
 
 @OptIn(ExperimentalCoroutinesApi::class) // Для flatMapLatest
 class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     private val taskDao = AppDatabase.getDatabase(application).taskDao()
+    private val alarmManagerHelper = AlarmManagerHelper(application)
+    private val notificationScheduler = NotificationScheduler(application)
 
     val allTasksFlow: Flow<List<Task>> = taskDao.getAllTasks()
 
@@ -44,15 +48,31 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     val selectedTask: LiveData<Task?> get() = _selectedTask
 
     fun insertTask(task: Task) = viewModelScope.launch {
-        taskDao.insertTask(task)
+        try {
+            taskDao.insertTask(task)
+            notificationScheduler.scheduleNotificationForTask(task)
+        } catch (e: Exception) {
+            android.util.Log.e("TaskViewModel", "Error inserting task", e)
+        }
     }
 
     fun updateTask(task: Task) = viewModelScope.launch {
-        taskDao.updateTask(task)
+        try {
+            taskDao.updateTask(task)
+            notificationScheduler.cancelNotificationForTask(task.id)
+            notificationScheduler.scheduleNotificationForTask(task)
+        } catch (e: Exception) {
+            android.util.Log.e("TaskViewModel", "Error updating task", e)
+        }
     }
 
     fun deleteTask(task: Task) = viewModelScope.launch {
-        taskDao.deleteTask(task)
+        try {
+            notificationScheduler.cancelNotificationForTask(task.id)
+            taskDao.deleteTask(task)
+        } catch (e: Exception) {
+            android.util.Log.e("TaskViewModel", "Error deleting task", e)
+        }
     }
 
     fun loadTaskById(taskId: Long) {
@@ -86,6 +106,15 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+    
+    fun rescheduleAllNotifications() = viewModelScope.launch {
+        try {
+            notificationScheduler.rescheduleAllTasks()
+        } catch (e: Exception) {
+            android.util.Log.e("TaskViewModel", "Error rescheduling notifications", e)
+        }
+    }
+    
     class TaskViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(TaskViewModel::class.java)) {

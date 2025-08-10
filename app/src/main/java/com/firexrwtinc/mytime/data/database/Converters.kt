@@ -1,6 +1,8 @@
 package com.firexrwtinc.mytime.data.database
 
 import androidx.room.TypeConverter
+import com.firexrwtinc.mytime.data.model.RecurrenceType
+import com.firexrwtinc.mytime.data.model.ThemeMode
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -29,17 +31,31 @@ class Converters {
         return value?.let { LocalTime.parse(it, timeFormatter) }
     }
 
-    // Конвертер для списка оборудования (если решим хранить как строку JSON или разделенную запятыми)
-    // Пока оставляем оборудование как простую строку в Task.kt, этот конвертер для примера
-    /*
     @TypeConverter
-    fun fromStringList(list: List<String>?): String? {
-        return list?.joinToString(",")
+    fun fromRecurrenceType(recurrenceType: RecurrenceType): String {
+        return recurrenceType.name
     }
 
     @TypeConverter
-    fun toStringList(value: String?): List<String>? {
-        return value?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+    fun toRecurrenceType(value: String): RecurrenceType {
+        return try {
+            RecurrenceType.valueOf(value)
+        } catch (e: IllegalArgumentException) {
+            RecurrenceType.NONE
+        }
     }
-    */
+
+    @TypeConverter
+    fun fromThemeMode(themeMode: ThemeMode): String {
+        return themeMode.name
+    }
+
+    @TypeConverter
+    fun toThemeMode(value: String): ThemeMode {
+        return try {
+            ThemeMode.valueOf(value)
+        } catch (e: IllegalArgumentException) {
+            ThemeMode.SYSTEM
+        }
+    }
 }

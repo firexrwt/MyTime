@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.EuroSymbol
@@ -41,18 +42,19 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -67,11 +69,15 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.firexrwtinc.mytime.R
+import com.firexrwtinc.mytime.data.database.AppDatabase
 import com.firexrwtinc.mytime.data.model.Task
+import com.firexrwtinc.mytime.data.model.TaskTemplate
 import com.firexrwtinc.mytime.hexToColor
-import com.firexrwtinc.mytime.ui.TaskViewModel
+import com.firexrwtinc.mytime.ui.settings.SettingsViewModel
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
@@ -95,11 +101,17 @@ fun CreateTaskScreen(
     var taskEndTime by remember { mutableStateOf(LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(2)) }
     var endTimeManuallyChanged by remember { mutableStateOf(false) }
     var taskLocation by remember { mutableStateOf("") }
+    var taskLatitude by remember { mutableStateOf<Double?>(null) }
+    var taskLongitude by remember { mutableStateOf<Double?>(null) }
     var taskEquipment by remember { mutableStateOf("") }
     var taskPriceString by remember { mutableStateOf("") }
     var selectedReminderHours by remember { mutableStateOf<Int?>(null) }
     var selectedColorHex by remember { mutableStateOf("#82B1FF") } // Default Blue A100
     var showColorPicker by remember { mutableStateOf(false) }
+    var showTemplateDialog by remember { mutableStateOf(false) }
+    var availableTemplates by remember { mutableStateOf<List<TaskTemplate>>(emptyList()) }
+    var taskDescription by remember { mutableStateOf("") }
+    var showLocationPicker by remember { mutableStateOf(false) }
 
     val isEditing = taskIdToEdit != 0L
     val existingTaskState by taskViewModel.selectedTask.observeAsState()
@@ -112,10 +124,13 @@ fun CreateTaskScreen(
         } else {
             // Сброс полей для новой задачи, установка переданной даты
             taskTitle = ""
+            taskDescription = ""
             taskDate = selectedDateArg
             taskStartTime = LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(1)
             taskEndTime = LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(2)
             taskLocation = ""
+            taskLatitude = null
+            taskLongitude = null
             taskEquipment = ""
             taskPriceString = ""
             selectedReminderHours = null
@@ -131,10 +146,13 @@ fun CreateTaskScreen(
         if (isEditing && existingTaskState != null) {
             existingTaskState?.let { task ->
                 taskTitle = task.title
+                taskDescription = task.description
                 taskDate = task.date
                 taskStartTime = task.startTime
                 taskEndTime = task.endTime
                 taskLocation = task.location ?: ""
+                taskLatitude = task.locationLatitude
+                taskLongitude = task.locationLongitude
                 taskEquipment = task.equipment ?: ""
                 taskPriceString = task.price?.toString() ?: ""
                 selectedReminderHours = task.reminderHoursBefore
@@ -144,9 +162,46 @@ fun CreateTaskScreen(
         }
     }
 
+    // Загрузка доступных шаблонов
+    LaunchedEffect(Unit) {
+        val database = AppDatabase.getDatabase(context)
+        val templateDao = database.taskTemplateDao()
+        templateDao.getAllTemplates().collect { templates ->
+            availableTemplates = templates
+        }
+    }
 
+    // Функция применения шаблона
+    fun applyTemplate(template: TaskTemplate) {
+        if (!isEditing) { // Применяем шаблон только при создании новой задачи
+            taskTitle = template.name
+            taskDescription = template.description
+            taskLocation = template.location
+            taskLatitude = null // Шаблоны пока не сохраняют координаты
+            taskLongitude = null
+            taskEquipment = template.equipment
+            selectedColorHex = template.colorHex
+            selectedReminderHours = (template.notificationMinutesBefore / 60).takeIf { it > 0 }
+            
+            // Устанавливаем время окончания на основе длительности шаблона
+            taskEndTime = taskStartTime.plusMinutes(template.defaultDurationMinutes.toLong())
+            endTimeManuallyChanged = false
+        }
+        showTemplateDialog = false
+    }
+
+
+    val settingsViewModel: SettingsViewModel = viewModel()
+    val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+    
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd MMMM yyyy") }
-    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val timeFormatter = remember(settings) { 
+        if (settings.timeFormat24Hour) {
+            DateTimeFormatter.ofPattern("HH:mm")
+        } else {
+            DateTimeFormatter.ofPattern("h:mm a")
+        }
+    }
 
     val datePickerDialog = DatePickerDialog(
         context,
@@ -158,29 +213,6 @@ fun CreateTaskScreen(
         taskDate.dayOfMonth
     )
 
-    val startTimePickerDialog = TimePickerDialog(
-        context,
-        { _, hourOfDay: Int, minute: Int ->
-            taskStartTime = LocalTime.of(hourOfDay, minute)
-            if (!endTimeManuallyChanged || !taskEndTime.isAfter(taskStartTime)) {
-                taskEndTime = taskStartTime.plusHours(1)
-            }
-        },
-        taskStartTime.hour,
-        taskStartTime.minute,
-        true // 24-hour format
-    )
-
-    val endTimePickerDialog = TimePickerDialog(
-        context,
-        { _, hourOfDay: Int, minute: Int ->
-            taskEndTime = LocalTime.of(hourOfDay, minute)
-            endTimeManuallyChanged = true
-        },
-        taskEndTime.hour,
-        taskEndTime.minute,
-        true // 24-hour format
-    )
 
     val reminderOptions = listOf(
         null to stringResource(R.string.reminder_option_no),
@@ -219,10 +251,13 @@ fun CreateTaskScreen(
                     val taskToSave = Task(
                         id = if (isEditing) taskIdToEdit else 0L,
                         title = taskTitle.trim(),
+                        description = taskDescription.trim(),
                         date = taskDate,
                         startTime = taskStartTime,
                         endTime = taskEndTime,
                         location = taskLocation.takeIf { it.isNotBlank() },
+                        locationLatitude = taskLatitude,
+                        locationLongitude = taskLongitude,
                         equipment = taskEquipment.takeIf { it.isNotBlank() },
                         price = taskPriceString.toDoubleOrNull(),
                         reminderHoursBefore = selectedReminderHours,
@@ -256,6 +291,18 @@ fun CreateTaskScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp) // Уменьшил немного расстояние между элементами
         ) {
+            // Кнопка выбора шаблона (только для новых задач)
+            if (!isEditing && availableTemplates.isNotEmpty()) {
+                Button(
+                    onClick = { showTemplateDialog = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.Palette, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Выбрать шаблон")
+                }
+            }
+
             OutlinedTextField(
                 value = taskTitle,
                 onValueChange = { taskTitle = it },
@@ -266,6 +313,17 @@ fun CreateTaskScreen(
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next)
             )
 
+            // Поле описания
+            OutlinedTextField(
+                value = taskDescription,
+                onValueChange = { taskDescription = it },
+                label = { Text("Описание") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                maxLines = 4,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next)
+            )
+
             OutlinedTextField(
                 value = taskDate.format(dateFormatter),
                 onValueChange = { /* Read-only */ },
@@ -273,44 +331,60 @@ fun CreateTaskScreen(
                 leadingIcon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null)},
                 modifier = Modifier.fillMaxWidth().clickable { datePickerDialog.show() },
                 readOnly = true,
-                // Чтобы поле выглядело неактивным для прямого ввода, но кликабельным
-                colors = ExposedDropdownMenuDefaults.textFieldColors(
+                colors = OutlinedTextFieldDefaults.colors(
                     disabledTextColor = MaterialTheme.colorScheme.onSurface,
                     disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledBorderColor = MaterialTheme.colorScheme.outline
                 )
             )
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(
-                    value = taskStartTime.format(timeFormatter),
-                    onValueChange = { /* Read-only */ },
-                    label = { Text(stringResource(R.string.label_start_time)) },
-                    leadingIcon = { Icon(Icons.Outlined.AccessTime, contentDescription = null)},
-                    modifier = Modifier.weight(1f).clickable { startTimePickerDialog.show() },
-                    readOnly = true,
-                    colors = ExposedDropdownMenuDefaults.textFieldColors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                )
-                OutlinedTextField(
-                    value = taskEndTime.format(timeFormatter),
-                    onValueChange = { /* Read-only */ },
-                    label = { Text(stringResource(R.string.label_end_time)) },
-                    leadingIcon = { Icon(Icons.Outlined.AccessTime, contentDescription = null)},
-                    modifier = Modifier.weight(1f).clickable { endTimePickerDialog.show() },
-                    readOnly = true,
-                    colors = ExposedDropdownMenuDefaults.textFieldColors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                )
+                Button(
+                    onClick = {
+                        TimePickerDialog(
+                            context,
+                            { _, hourOfDay: Int, minute: Int ->
+                                taskStartTime = LocalTime.of(hourOfDay, minute)
+                                if (!endTimeManuallyChanged || !taskEndTime.isBefore(taskStartTime)) {
+                                    taskEndTime = taskStartTime.plusHours(1)
+                                }
+                            },
+                            taskStartTime.hour,
+                            taskStartTime.minute,
+                            settings.timeFormat24Hour
+                        ).show()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row {
+                        Icon(Icons.Outlined.AccessTime, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("${stringResource(R.string.label_start_time)}: ${taskStartTime.format(timeFormatter)}")
+                    }
+                }
+                
+                Button(
+                    onClick = {
+                        TimePickerDialog(
+                            context,
+                            { _, hourOfDay: Int, minute: Int ->
+                                taskEndTime = LocalTime.of(hourOfDay, minute)
+                                endTimeManuallyChanged = true
+                            },
+                            taskEndTime.hour,
+                            taskEndTime.minute,
+                            settings.timeFormat24Hour
+                        ).show()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row {
+                        Icon(Icons.Outlined.AccessTime, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("${stringResource(R.string.label_end_time)}: ${taskEndTime.format(timeFormatter)}")
+                    }
+                }
             }
 
             OutlinedTextField(
@@ -318,10 +392,16 @@ fun CreateTaskScreen(
                 onValueChange = { taskLocation = it },
                 label = { Text(stringResource(R.string.label_location)) },
                 leadingIcon = { Icon(Icons.Outlined.LocationOn, contentDescription = null)},
-                placeholder = { Text(stringResource(R.string.hint_location)) },
+                placeholder = { Text("Широта, Долгота (например: 55.7558, 37.6176)") },
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-                // TODO: Implement Google Maps Place Picker for location
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                supportingText = { 
+                    Text(
+                        text = "💡 Откройте навигатор (Google Maps/Яндекс.Карты), найдите место и скопируйте координаты",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             )
 
             OutlinedTextField(
@@ -377,7 +457,6 @@ fun CreateTaskScreen(
                             onClick = {
                                 selectedReminderHours = selectionOption.first
                                 reminderDropdownExpanded = false
-                                // TODO: Implement actual alarm scheduling using AlarmManager
                             }
                         )
                     }
@@ -420,6 +499,15 @@ fun CreateTaskScreen(
                     onDismiss = { showColorPicker = false }
                 )
             }
+
+            if (showTemplateDialog) {
+                TemplateSelectionDialog(
+                    templates = availableTemplates,
+                    onTemplateSelected = ::applyTemplate,
+                    onDismiss = { showTemplateDialog = false }
+                )
+            }
+
 
             Spacer(modifier = Modifier.height(72.dp)) // Отступ для плавающей кнопки сохранения
         }
@@ -503,6 +591,61 @@ fun ColorPickerDialog(
                     onValueChange = { hue = it },
                     valueRange = 0f..360f
                 )
+            }
+        }
+    )
+}
+
+@Composable
+fun TemplateSelectionDialog(
+    templates: List<TaskTemplate>,
+    onTemplateSelected: (TaskTemplate) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Выберите шаблон") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                templates.forEach { template ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onTemplateSelected(template) }
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(hexToColor(template.colorHex))
+                        )
+                        
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
+                        Column {
+                            Text(
+                                text = template.name,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            if (template.description.isNotEmpty()) {
+                                Text(
+                                    text = template.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена")
             }
         }
     )
