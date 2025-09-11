@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.firexrwtinc.mytime.ui.settings.AppTheme
 
 val Typography = Typography(
     bodyLarge = TextStyle(
@@ -51,6 +52,17 @@ private val LightColorScheme = lightColorScheme(
     */
 )
 
+/**
+ * Extension function to determine if dark theme should be used based on AppTheme setting
+ */
+fun AppTheme.isDarkTheme(isSystemInDarkTheme: Boolean): Boolean {
+    return when (this) {
+        AppTheme.LIGHT -> false
+        AppTheme.DARK -> true
+        AppTheme.SYSTEM -> isSystemInDarkTheme
+    }
+}
+
 @Composable
 fun MyTimeTheme( // Имя вашей темы
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -78,6 +90,26 @@ fun MyTimeTheme( // Имя вашей темы
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography, // Убедитесь, что у вас есть Typography.kt
+        content = content
+    )
+}
+
+/**
+ * Overloaded MyTimeTheme that accepts AppTheme instead of boolean
+ */
+@Composable
+fun MyTimeTheme(
+    appTheme: AppTheme,
+    // Dynamic color is available on Android 12+
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    val systemInDarkTheme = isSystemInDarkTheme()
+    val darkTheme = appTheme.isDarkTheme(systemInDarkTheme)
+    
+    MyTimeTheme(
+        darkTheme = darkTheme,
+        dynamicColor = dynamicColor,
         content = content
     )
 }

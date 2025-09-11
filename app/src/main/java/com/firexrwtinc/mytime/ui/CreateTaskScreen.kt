@@ -7,6 +7,8 @@ import android.widget.DatePicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.EuroSymbol
 import androidx.compose.material.icons.outlined.ListAlt
 import androidx.compose.material.icons.outlined.LocationOn
@@ -85,6 +88,7 @@ fun CreateTaskScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     var taskTitle by remember { mutableStateOf("") }
+    var taskDescription by remember { mutableStateOf("") }
     var taskDate by remember { mutableStateOf(selectedDateArg) }
     var taskStartTime by remember { mutableStateOf(LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(1)) }
     var taskEndTime by remember { mutableStateOf(LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(2)) }
@@ -105,6 +109,7 @@ fun CreateTaskScreen(
         } else {
             // Сброс полей для новой задачи, установка переданной даты
             taskTitle = ""
+            taskDescription = ""
             taskDate = selectedDateArg
             taskStartTime = LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(1)
             taskEndTime = LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(2)
@@ -123,6 +128,7 @@ fun CreateTaskScreen(
         if (isEditing && existingTaskState != null) {
             existingTaskState?.let { task ->
                 taskTitle = task.title
+                taskDescription = task.description ?: ""
                 taskDate = task.date
                 taskStartTime = task.startTime
                 taskEndTime = task.endTime
@@ -206,6 +212,7 @@ fun CreateTaskScreen(
                     val taskToSave = Task(
                         id = if (isEditing) taskIdToEdit else 0L,
                         title = taskTitle.trim(),
+                        description = taskDescription.trim().takeIf { it.isNotBlank() },
                         date = taskDate,
                         startTime = taskStartTime,
                         endTime = taskEndTime,
@@ -254,49 +261,72 @@ fun CreateTaskScreen(
             )
 
             OutlinedTextField(
+                value = taskDescription,
+                onValueChange = { taskDescription = it },
+                label = { Text(stringResource(R.string.label_task_description)) },
+                placeholder = { Text(stringResource(R.string.hint_task_description)) },
+                leadingIcon = { Icon(Icons.Outlined.Description, contentDescription = null)},
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                maxLines = 4,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next)
+            )
+
+            OutlinedTextField(
                 value = taskDate.format(dateFormatter),
-                onValueChange = { /* Read-only */ },
+                onValueChange = { },
                 label = { Text(stringResource(R.string.label_date)) },
                 leadingIcon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null)},
                 modifier = Modifier.fillMaxWidth().clickable { datePickerDialog.show() },
                 readOnly = true,
-                // Чтобы поле выглядело неактивным для прямого ввода, но кликабельным
-                colors = ExposedDropdownMenuDefaults.textFieldColors(
-                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                interactionSource = remember { MutableInteractionSource() }
+                    .also { interactionSource ->
+                        LaunchedEffect(interactionSource) {
+                            interactionSource.interactions.collect {
+                                if (it is PressInteraction.Release) {
+                                    datePickerDialog.show()
+                                }
+                            }
+                        }
+                    }
             )
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
                     value = taskStartTime.format(timeFormatter),
-                    onValueChange = { /* Read-only */ },
+                    onValueChange = { },
                     label = { Text(stringResource(R.string.label_start_time)) },
                     leadingIcon = { Icon(Icons.Outlined.AccessTime, contentDescription = null)},
                     modifier = Modifier.weight(1f).clickable { startTimePickerDialog.show() },
                     readOnly = true,
-                    colors = ExposedDropdownMenuDefaults.textFieldColors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    interactionSource = remember { MutableInteractionSource() }
+                        .also { interactionSource ->
+                            LaunchedEffect(interactionSource) {
+                                interactionSource.interactions.collect {
+                                    if (it is PressInteraction.Release) {
+                                        startTimePickerDialog.show()
+                                    }
+                                }
+                            }
+                        }
                 )
                 OutlinedTextField(
                     value = taskEndTime.format(timeFormatter),
-                    onValueChange = { /* Read-only */ },
+                    onValueChange = { },
                     label = { Text(stringResource(R.string.label_end_time)) },
                     leadingIcon = { Icon(Icons.Outlined.AccessTime, contentDescription = null)},
                     modifier = Modifier.weight(1f).clickable { endTimePickerDialog.show() },
                     readOnly = true,
-                    colors = ExposedDropdownMenuDefaults.textFieldColors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    interactionSource = remember { MutableInteractionSource() }
+                        .also { interactionSource ->
+                            LaunchedEffect(interactionSource) {
+                                interactionSource.interactions.collect {
+                                    if (it is PressInteraction.Release) {
+                                        endTimePickerDialog.show()
+                                    }
+                                }
+                            }
+                        }
                 )
             }
 
@@ -346,12 +376,7 @@ fun CreateTaskScreen(
                     readOnly = true,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = reminderDropdownExpanded) },
                     modifier = Modifier.menuAnchor().fillMaxWidth(),
-                    colors = ExposedDropdownMenuDefaults.textFieldColors( // Чтобы выглядело кликабельным
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    colors = ExposedDropdownMenuDefaults.textFieldColors()
                 )
                 ExposedDropdownMenu(
                     expanded = reminderDropdownExpanded,
@@ -416,7 +441,7 @@ fun ColorDot(color: Color, isSelected: Boolean, onClick: () -> Unit) {
         if (isSelected) {
             Icon(
                 Icons.Filled.Check,
-                contentDescription = "Selected Color",
+                contentDescription = stringResource(R.string.selected_color),
                 tint = if (color.luminance() > 0.5f) Color.Black else Color.White,
                 modifier = Modifier.size(18.dp) // Уменьшил галочку
             )

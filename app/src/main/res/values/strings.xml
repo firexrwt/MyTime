@@ -1,63 +1,137 @@
 <resources>
     <string name="app_name">MyTime</string>
-    <string name="action_edit">Редактировать</string>
-    <string name="action_delete">Удалить</string>
-    <string name="action_close">Закрыть</string>
-    <string name="action_yes">Да</string>
-    <string name="action_cancel">Отмена</string>
-    <string name="title_home">Главная</string>
-    <string name="title_dashboard">Панель</string>
-    <string name="title_notifications">Уведомления</string>
-    <string name="delete_confirmation_title">Подтверждение</string>
-    <string name="delete_confirmation_message">Вы уверены, что хотите удалить задачу \"%1$s\"?</string>
-    <string name="task_deleted_message">Задача удалена</string>
-    <string name="details_date">Дата: %1$s</string>
-    <string name="details_time">Время: %1$s - %2$s</string>
-    <string name="details_location">Место: %1$s</string>
-    <string name="details_equipment">Оборудование: %1$s</string>
-    <string name="details_price">Цена: %1$s</string>
-    <string name="details_reminder">Напоминание: %1$s</string>
-    <string name="details_color_label">Цвет:</string>
-    <string name="reminder_option_generic_hours">За %1$d ч.</string> <string name="title_edit_task">Редактировать задачу</string>
-    <string name="title_new_task">Новая задача</string>
-    <string name="desc_previous_day">Предыдущий день</string>
-    <string name="desc_next_day">Следующий день</string>
-    <string name="desc_back">Назад</string>
-    <string name="desc_open_drawer">Открыть меню</string>
-    <string name="desc_add_task">Добавить задачу</string>
-    <string name="desc_previous_week">Предыдущая неделя</string>
-    <string name="desc_next_week">Следующая неделя</string>
-    <string name="desc_previous_month">Предыдущий месяц</string>
-    <string name="desc_next_month">Следующий месяц</string>
-    <string name="desc_previous_year">Предыдущий год</string>
-    <string name="desc_next_year">Следующий год</string>
-    <string name="screen_day">День</string>
-    <string name="screen_week">Неделя</string>
-    <string name="screen_month">Месяц</string>
-    <string name="screen_year">Год</string>
-    <string name="label_task_title">Название задачи</string>
-    <string name="label_date">Дата</string>
-    <string name="label_start_time">Начало</string>
-    <string name="label_end_time">Конец</string>
-    <string name="label_location">Местоположение</string>
-    <string name="hint_location">Например, офис, дом</string>
-    <string name="label_equipment">Оборудование/Заметки</string>
-    <string name="hint_equipment">Например, ноутбук, проектор</string>
-    <string name="label_price">Стоимость</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_close">Close</string>
+    <string name="action_yes">Yes</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="title_home">Home</string>
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_notifications">Notifications</string>
+    <string name="delete_confirmation_title">Confirmation</string>
+    <string name="delete_confirmation_message">Are you sure you want to delete task \"%1$s\"?</string>
+    <string name="task_deleted_message">Task deleted</string>
+    <string name="details_date">Date: %1$s</string>
+    <string name="details_time">Time: %1$s - %2$s</string>
+    <string name="details_description">Description: %1$s</string>
+    <string name="details_location">Location: %1$s</string>
+    <string name="details_equipment">Equipment: %1$s</string>
+    <string name="details_price">Price: %1$s</string>
+    <string name="details_reminder">Reminder: %1$s</string>
+    <string name="details_color_label">Color:</string>
+    <string name="reminder_option_generic_hours">%1$d hours before</string>
+    <string name="title_edit_task">Edit Task</string>
+    <string name="title_new_task">New Task</string>
+    <string name="desc_previous_day">Previous day</string>
+    <string name="desc_next_day">Next day</string>
+    <string name="desc_back">Back</string>
+    <string name="desc_open_drawer">Open menu</string>
+    <string name="desc_add_task">Add task</string>
+    <string name="desc_previous_week">Previous week</string>
+    <string name="desc_next_week">Next week</string>
+    <string name="desc_previous_month">Previous month</string>
+    <string name="desc_next_month">Next month</string>
+    <string name="desc_previous_year">Previous year</string>
+    <string name="desc_next_year">Next year</string>
+    <string name="screen_day">Day</string>
+    <string name="screen_week">Week</string>
+    <string name="screen_month">Month</string>
+    <string name="screen_year">Year</string>
+    <string name="label_task_title">Task Title</string>
+    <string name="label_task_description">Description</string>
+    <string name="hint_task_description">Additional information about the task</string>
+    <string name="label_date">Date</string>
+    <string name="label_start_time">Start</string>
+    <string name="label_end_time">End</string>
+    <string name="label_location">Location</string>
+    <string name="hint_location">E.g. office, home</string>
+    <string name="label_equipment">Equipment/Notes</string>
+    <string name="hint_equipment">E.g. laptop, projector</string>
+    <string name="label_price">Cost</string>
     <string name="hint_price">0.00</string>
-    <string name="label_reminder">Напомнить</string>
-    <string name="label_task_color">Цвет задачи</string>
-    <string name="button_save_task">Сохранить задачу</string>
-    <string name="error_title_empty">Название задачи не может быть пустым.</string>
-    <string name="error_end_time_before_start">Время окончания не может быть раньше времени начала.</string>
-    <string name="reminder_option_no">Нет</string>
-    <string name="reminder_option_hours_1">За 1 час</string>
-    <string name="reminder_option_hours_2">За 2 часа</string>
-    <string name="reminder_option_hours_3">За 3 часа</string>
-    <string name="reminder_option_hours_4">За 4 часа</string>
-    <string name="reminder_option_hours_5">За 5 часов</string>
-    <string name="reminder_option_hours_6">За 6 часов</string>
-    <string name="reminder_option_hours_7">За 7 часов</string>
-    <string name="reminder_option_hours_8">За 8 часов</string>
-    <string name="reminder_option_hours_9">За 9 часов</string>
+    <string name="label_reminder">Remind</string>
+    <string name="label_task_color">Task Color</string>
+    <string name="button_save_task">Save Task</string>
+    <string name="error_title_empty">Task title cannot be empty.</string>
+    <string name="error_end_time_before_start">End time cannot be before start time.</string>
+    <string name="reminder_option_no">No</string>
+    <string name="reminder_option_hours_1">1 hour before</string>
+    <string name="reminder_option_hours_2">2 hours before</string>
+    <string name="reminder_option_hours_3">3 hours before</string>
+    <string name="reminder_option_hours_4">4 hours before</string>
+    <string name="reminder_option_hours_5">5 hours before</string>
+    <string name="reminder_option_hours_6">6 hours before</string>
+    <string name="reminder_option_hours_7">7 hours before</string>
+    <string name="reminder_option_hours_8">8 hours before</string>
+    <string name="reminder_option_hours_9">9 hours before</string>
+    
+    <!-- Hardcoded strings from MainActivity that need localization -->
+    <string name="menu_item_1_example">Menu Item 1 (example)</string>
+    <string name="menu_item_2_example">Menu Item 2 (example)</string>
+    <string name="week_abbreviation">W</string>
+    <string name="pending_task_singular">pending task</string>
+    <string name="pending_tasks_few">pending tasks</string>
+    <string name="pending_tasks_many">pending tasks</string>
+    
+    <!-- Fragment placeholder texts -->
+    <string name="home_fragment_text">This is home Fragment</string>
+    <string name="dashboard_fragment_text">This is dashboard Fragment</string>
+    <string name="notifications_fragment_text">This is notifications Fragment</string>
+    
+    <!-- Accessibility strings -->
+    <string name="selected_color">Selected Color</string>
+    
+    <!-- Settings strings -->
+    <string name="title_settings">Settings</string>
+    <string name="menu_settings">Settings</string>
+    
+    <!-- Settings sections -->
+    <string name="settings_section_language">Language</string>
+    <string name="settings_section_notifications">Notifications</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_tasks">Tasks</string>
+    <string name="settings_section_data">Data</string>
+    <string name="settings_section_about">About</string>
+    
+    <!-- Language settings -->
+    <string name="settings_language">Language</string>
+    <string name="language_system">System Default</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
+    
+    <!-- Notification settings -->
+    <string name="settings_notifications_enabled">Enable Notifications</string>
+    <string name="settings_notification_sound">Notification Sound</string>
+    <string name="settings_vibration">Vibration</string>
+    <string name="settings_enabled">Enabled</string>
+    <string name="settings_disabled">Disabled</string>
+    
+    <!-- Notification sounds -->
+    <string name="notification_sound_default">Default</string>
+    <string name="notification_sound_bell">Bell</string>
+    <string name="notification_sound_chime">Chime</string>
+    <string name="notification_sound_none">None</string>
+    
+    <!-- Theme settings -->
+    <string name="settings_theme">Theme</string>
+    <string name="theme_system">System Default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    
+    <!-- Task settings -->
+    <string name="settings_default_task_duration">Default Task Duration</string>
+    <string name="settings_default_reminder">Default Reminder</string>
+    <string name="settings_show_weekends">Show Weekends</string>
+    <string name="settings_duration_minutes">%1$d minutes</string>
+    
+    <!-- Data settings -->
+    <string name="settings_backup_data">Backup Data</string>
+    <string name="settings_restore_data">Restore Data</string>
+    <string name="settings_backup_description">Export tasks and settings</string>
+    <string name="settings_restore_description">Import tasks from backup</string>
+    
+    <!-- About settings -->
+    <string name="settings_version">Version</string>
+    <string name="settings_about">About</string>
+    <string name="settings_about_description">Learn more about MyTime</string>
 </resources>

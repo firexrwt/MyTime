@@ -3,6 +3,8 @@ package com.firexrwtinc.mytime
 // import androidx.compose.runtime.livedata.observeAsState // Заменяем на collectAsStateWithLifecycle для Flow
 import android.annotation.SuppressLint
 import android.app.Application
+import android.content.Context
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -44,6 +46,7 @@ import androidx.compose.material.icons.filled.CalendarViewWeek
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DrawerValue
@@ -96,8 +99,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.firexrwtinc.mytime.data.model.Task
+import com.firexrwtinc.mytime.data.repository.SettingsManager
 import com.firexrwtinc.mytime.ui.CreateTaskScreen
 import com.firexrwtinc.mytime.ui.TaskViewModel
+import com.firexrwtinc.mytime.ui.settings.AppTheme
+import com.firexrwtinc.mytime.ui.settings.Language
+import com.firexrwtinc.mytime.ui.settings.LocaleContextWrapper
+import com.firexrwtinc.mytime.ui.settings.SettingsScreen
 import com.firexrwtinc.mytime.ui.theme.MyTimeTheme
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
@@ -120,7 +128,7 @@ import java.time.format.TextStyle as JavaTextStyle
 * TODO: Надо сделать логику для уведомлений за час до будильника(будильник должен звонить от 0 до 9 часов до задачи в зависимости от выбора пользователя на экране создания задач)
 * TODO: Добавить опцию редактирования уже существующих задач
 * TODO: Надо сделать опцию удаления существующих задач
-* TODO: Надо сделать настройки в сэндвич меню */
+* TODO: Надо сделать настройки в сэндвич меню - Готово */
 
 fun hexToColor(hex: String): Color {
     val colorString = if (hex.startsWith("#")) hex else "#$hex"
@@ -137,6 +145,7 @@ sealed class Screen(val route: String, val resourceId: Int? = null, val icon: Im
     object MonthView : Screen("month", R.string.screen_month, Icons.Filled.CalendarMonth)
     object YearView : Screen("year", R.string.screen_year, Icons.Filled.CalendarToday)
     object CreateTask : Screen("create_task")
+    object Settings : Screen("settings", R.string.title_settings)
 }
 
 val navItems = listOf(
@@ -153,11 +162,39 @@ const val MIN_SCALE_FACTOR = 0.4f
 const val MAX_SCALE_FACTOR = 4.0f
 
 class MainActivity : ComponentActivity() {
+    
+    private lateinit var settingsManager: SettingsManager
+    
+    override fun attachBaseContext(newBase: Context) {
+        // Initialize settings manager early to get language preference
+        val settingsManager = SettingsManager.getInstance(newBase.applicationContext)
+        val language = settingsManager.getLanguage()
+        
+        // Wrap the base context with the appropriate locale
+        val localeContext = LocaleContextWrapper.wrap(newBase, language)
+        super.attachBaseContext(localeContext)
+    }
+    
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialize settings manager
+        settingsManager = SettingsManager.getInstance(applicationContext)
+        
+        // Set up callbacks for settings changes that require activity recreation
+        settingsManager.setLanguageChangeCallback { language ->
+            // Language change requires activity recreation to update strings
+            recreate()
+        }
+        
         setContent {
-            MyTimeTheme {
+            // Observe theme changes and apply immediately
+            val currentTheme by settingsManager.theme.collectAsStateWithLifecycle(
+                initialValue = settingsManager.getTheme()
+            )
+            
+            MyTimeTheme(appTheme = currentTheme) {
                 val navController = rememberNavController()
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -186,15 +223,16 @@ class MainActivity : ComponentActivity() {
                             val startOfWeek = date.with(java.time.temporal.TemporalAdjusters.previousOrSame(firstDayOfWeekDevice))
                             val endOfWeek = startOfWeek.plusDays(6)
                             val weekNumber = startOfWeek.get(java.time.temporal.WeekFields.of(Locale.getDefault()).weekOfWeekBasedYear())
+                            val weekAbbr = application.getString(R.string.week_abbreviation)
 
                             topBarTitleFormatted = if (startOfWeek.year == endOfWeek.year) {
                                 if (startOfWeek.month == endOfWeek.month) {
-                                    "${startOfWeek.dayOfMonth} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMMM yy"))} (Н $weekNumber)"
+                                    "${startOfWeek.dayOfMonth} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMMM yy"))} ($weekAbbr $weekNumber)"
                                 } else {
-                                    "${startOfWeek.format(DateTimeFormatter.ofPattern("d MMM"))} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMMM yy"))} (Н $weekNumber)"
+                                    "${startOfWeek.format(DateTimeFormatter.ofPattern("d MMM"))} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMMM yy"))} ($weekAbbr $weekNumber)"
                                 }
                             } else {
-                                "${startOfWeek.format(DateTimeFormatter.ofPattern("d MMM yy"))} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMM yy"))} (Н $weekNumber)"
+                                "${startOfWeek.format(DateTimeFormatter.ofPattern("d MMM yy"))} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMM yy"))} ($weekAbbr $weekNumber)"
                             }
                         }
                         is Screen.MonthView -> topBarTitleFormatted = YearMonth.from(date).format(monthFormatter)
@@ -207,6 +245,7 @@ class MainActivity : ComponentActivity() {
                                 R.string.title_new_task
                             }
                         }
+                        is Screen.Settings -> topBarTitleStringRes = R.string.title_settings
                     }
                 }
 
@@ -220,10 +259,41 @@ class MainActivity : ComponentActivity() {
                     updateTitle(screenForTitleUpdate, displayedDate)
                 }
 
-                ModalNavigationDrawer(drawerState = drawerState, drawerContent = { ModalDrawerSheet {
-                    Text("Элемент меню 1 (пример)", modifier = Modifier.padding(16.dp))
-                    Text("Элемент меню 2 (пример)", modifier = Modifier.padding(16.dp))
-                } }) {
+                ModalNavigationDrawer(drawerState = drawerState, drawerContent = { 
+                    ModalDrawerSheet {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.app_name),
+                                style = MaterialTheme.typography.headlineSmall,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                            
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        scope.launch {
+                                            drawerState.close()
+                                            navController.navigate(Screen.Settings.route)
+                                        }
+                                    }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Settings,
+                                    contentDescription = stringResource(R.string.menu_settings),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(
+                                    text = stringResource(R.string.menu_settings),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
+                        }
+                    }
+                }) {
                     Scaffold(
                         snackbarHost = { SnackbarHost(snackbarHostState) },
                         topBar = {
@@ -237,6 +307,7 @@ class MainActivity : ComponentActivity() {
                                 navigationIcon = {
                                     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
                                     if (currentRoute?.startsWith(Screen.CreateTask.route.split("?").first()) == true ||
+                                        currentRoute == Screen.Settings.route ||
                                         (navController.previousBackStackEntry != null && navItems.none { it.route == currentRoute })) {
                                         IconButton(onClick = { navController.navigateUp() }) {
                                             Icon(Icons.Filled.ArrowBackIosNew, stringResource(R.string.desc_back))
@@ -251,7 +322,8 @@ class MainActivity : ComponentActivity() {
                         },
                         bottomBar = {
                             val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
-                            if (currentRoute?.startsWith(Screen.CreateTask.route.split("?").first()) != true) {
+                            if (currentRoute?.startsWith(Screen.CreateTask.route.split("?").first()) != true && 
+                                currentRoute != Screen.Settings.route) {
                                 NavigationBar {
                                     val currentDestination = navController.currentBackStackEntryAsState().value?.destination
                                     navItems.forEach { screen ->
@@ -360,6 +432,11 @@ fun AppNavHost(
                 taskViewModel = taskViewModel,
                 selectedDateArg = selectedDate,
                 taskIdToEdit = taskId
+            )
+        }
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onNavigateBack = { navController.navigateUp() }
             )
         }
     }
@@ -527,11 +604,11 @@ fun DayScreen(
     }
 }
 
-fun getPendingTasksString(count: Int): String {
+fun getPendingTasksString(count: Int, context: android.content.Context): String {
     return when {
-        count % 10 == 1 && count % 100 != 11 -> "ожидающая задача"
-        count % 10 in 2..4 && (count % 100 < 10 || count % 100 >= 20) -> "ожидающие задачи"
-        else -> "ожидающих задач"
+        count % 10 == 1 && count % 100 != 11 -> context.getString(R.string.pending_task_singular)
+        count % 10 in 2..4 && (count % 100 < 10 || count % 100 >= 20) -> context.getString(R.string.pending_tasks_few)
+        else -> context.getString(R.string.pending_tasks_many)
     }
 }
 
