@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.firexrwtinc.mytime.data.database.AppDatabase
 import com.firexrwtinc.mytime.data.model.Task
+import com.firexrwtinc.mytime.notifications.NotificationHelper
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +26,7 @@ import java.util.Locale
 class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     private val taskDao = AppDatabase.getDatabase(application).taskDao()
+    private val notificationHelper = NotificationHelper(application)
 
     val allTasksFlow: Flow<List<Task>> = taskDao.getAllTasks()
 
@@ -45,13 +47,34 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     fun insertTask(task: Task) = viewModelScope.launch {
         taskDao.insertTask(task)
+        // Schedule notification if reminder is set (don't let this break task saving)
+        try {
+            notificationHelper.scheduleTaskReminder(task)
+        } catch (e: Exception) {
+            // Log error but don't break task saving
+            android.util.Log.e("TaskViewModel", "Failed to schedule notification", e)
+        }
     }
 
     fun updateTask(task: Task) = viewModelScope.launch {
         taskDao.updateTask(task)
+        // Update notification (cancel old and schedule new if needed)
+        try {
+            notificationHelper.updateTaskReminder(task)
+        } catch (e: Exception) {
+            // Log error but don't break task updating
+            android.util.Log.e("TaskViewModel", "Failed to update notification", e)
+        }
     }
 
     fun deleteTask(task: Task) = viewModelScope.launch {
+        // Cancel notification before deleting task
+        try {
+            notificationHelper.cancelTaskReminder(task.id)
+        } catch (e: Exception) {
+            // Log error but don't break task deletion
+            android.util.Log.e("TaskViewModel", "Failed to cancel notification", e)
+        }
         taskDao.deleteTask(task)
     }
 
@@ -86,6 +109,25 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    // --- Notification system methods ---
+
+    /**
+     * Checks if the app can schedule exact alarms (required for reliable notifications).
+     * This is particularly important for Android 12+ devices.
+     */
+    fun canScheduleExactAlarms(): Boolean {
+        return notificationHelper.canScheduleExactAlarms()
+    }
+
+    /**
+     * Returns an Intent to request exact alarm permission for Android 12+ devices.
+     * Returns null for older Android versions where this permission is not needed.
+     */
+    fun getExactAlarmPermissionIntent(): android.content.Intent? {
+        return notificationHelper.getExactAlarmPermissionIntent()
+    }
+
     class TaskViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(TaskViewModel::class.java)) {

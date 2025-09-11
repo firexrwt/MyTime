@@ -388,7 +388,6 @@ fun CreateTaskScreen(
                             onClick = {
                                 selectedReminderHours = selectionOption.first
                                 reminderDropdownExpanded = false
-                                // TODO: Implement actual alarm scheduling using AlarmManager
                             }
                         )
                     }
