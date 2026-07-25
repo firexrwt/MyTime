@@ -33,7 +33,8 @@ class SettingsManager private constructor(context: Context) {
     val defaultTaskDuration: Flow<Int> = repository.defaultTaskDuration
     val defaultReminderHours: Flow<Int> = repository.defaultReminderHours
     val showWeekends: Flow<Boolean> = repository.showWeekends
-    
+    val onboardingCompleted: Flow<Boolean> = repository.onboardingCompleted
+
     // Register callbacks for immediate changes
     fun setLanguageChangeCallback(callback: (Language) -> Unit) {
         onLanguageChangeCallback = callback
@@ -108,7 +109,15 @@ class SettingsManager private constructor(context: Context) {
         repository.setShowWeekends(show)
         onSettingsChangeCallback?.invoke()
     }
-    
+
+    // Onboarding methods
+    fun getOnboardingCompleted(): Boolean = repository.getOnboardingCompleted()
+
+    fun setOnboardingCompleted(completed: Boolean) {
+        repository.setOnboardingCompleted(completed)
+        onSettingsChangeCallback?.invoke()
+    }
+
     companion object {
         @Volatile
         private var INSTANCE: SettingsManager? = null

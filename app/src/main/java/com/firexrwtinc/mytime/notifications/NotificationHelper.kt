@@ -9,7 +9,6 @@ import android.util.Log
 import com.firexrwtinc.mytime.data.model.Task
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.util.Calendar
 import java.time.format.DateTimeFormatter
 
 /**
@@ -23,6 +22,13 @@ class NotificationHelper(private val context: Context) {
 
     companion object {
         private const val TAG = "NotificationHelper"
+
+        /** Moment the reminder should fire, or null if no reminder is set/valid. */
+        fun reminderTimeFor(task: Task): LocalDateTime? {
+            val hours = task.reminderHoursBefore ?: return null
+            if (hours <= 0) return null
+            return LocalDateTime.of(task.date, task.startTime).minusHours(hours.toLong())
+        }
     }
 
     /**
@@ -31,12 +37,8 @@ class NotificationHelper(private val context: Context) {
      */
     fun scheduleTaskReminder(task: Task) {
         // Only schedule if reminder is set and task hasn't passed
-        val reminderHours = task.reminderHoursBefore ?: return
-        if (reminderHours <= 0) return
+        val reminderDateTime = reminderTimeFor(task) ?: return
 
-        val taskDateTime = LocalDateTime.of(task.date, task.startTime)
-        val reminderDateTime = taskDateTime.minusHours(reminderHours.toLong())
-        
         // Don't schedule if reminder time has already passed
         if (reminderDateTime.isBefore(LocalDateTime.now())) {
             Log.d(TAG, "Reminder time has passed for task: ${task.title}")
@@ -118,6 +120,9 @@ class NotificationHelper(private val context: Context) {
             putExtra(NotificationReceiver.EXTRA_TASK_ID, task.id)
             putExtra(NotificationReceiver.EXTRA_TASK_TITLE, task.title)
             putExtra(NotificationReceiver.EXTRA_TASK_LOCATION, task.location)
+            putExtra(NotificationReceiver.EXTRA_TASK_LOCATION_TYPE, task.locationType.name)
+            putExtra(NotificationReceiver.EXTRA_TASK_LOCATION_LAT, task.locationLat ?: 0.0)
+            putExtra(NotificationReceiver.EXTRA_TASK_LOCATION_LNG, task.locationLng ?: 0.0)
             putExtra(NotificationReceiver.EXTRA_TASK_START_TIME, task.startTime.format(timeFormatter))
         }
     }

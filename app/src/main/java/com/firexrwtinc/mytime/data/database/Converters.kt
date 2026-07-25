@@ -1,11 +1,19 @@
 package com.firexrwtinc.mytime.data.database
 
 import androidx.room.TypeConverter
+import com.firexrwtinc.mytime.data.model.LocationType
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 class Converters {
+
+    @TypeConverter
+    fun fromLocationType(type: LocationType): String = type.name
+
+    @TypeConverter
+    fun toLocationType(value: String): LocationType =
+        runCatching { LocationType.valueOf(value) }.getOrDefault(LocationType.NONE)
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     private val timeFormatter = DateTimeFormatter.ISO_LOCAL_TIME
 

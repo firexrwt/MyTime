@@ -33,6 +33,13 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC, startTime ASC")
     fun getTasksForDateRange(startDate: LocalDate, endDate: LocalDate): Flow<List<Task>>
 
+    /**
+     * One-shot snapshot of tasks that still need an alarm scheduled.
+     * Used after reboot / app update, where all pending alarms are wiped by the system.
+     */
+    @Query("SELECT * FROM tasks WHERE reminderHoursBefore IS NOT NULL AND date >= :fromDate")
+    suspend fun getTasksWithRemindersFrom(fromDate: LocalDate): List<Task>
+
     // Search methods
     /**
      * Search tasks by title and description text.

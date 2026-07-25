@@ -5,9 +5,6 @@
     <string name="action_close">Close</string>
     <string name="action_yes">Yes</string>
     <string name="action_cancel">Cancel</string>
-    <string name="title_home">Home</string>
-    <string name="title_dashboard">Dashboard</string>
-    <string name="title_notifications">Notifications</string>
     <string name="delete_confirmation_title">Confirmation</string>
     <string name="delete_confirmation_message">Are you sure you want to delete task \"%1$s\"?</string>
     <string name="task_deleted_message">Task deleted</string>
@@ -25,6 +22,7 @@
     <string name="desc_previous_day">Previous day</string>
     <string name="desc_next_day">Next day</string>
     <string name="desc_back">Back</string>
+    <string name="desc_search">Search</string>
     <string name="desc_open_drawer">Open menu</string>
     <string name="desc_add_task">Add task</string>
     <string name="desc_previous_week">Previous week</string>
@@ -72,11 +70,6 @@
     <string name="pending_task_singular">pending task</string>
     <string name="pending_tasks_few">pending tasks</string>
     <string name="pending_tasks_many">pending tasks</string>
-    
-    <!-- Fragment placeholder texts -->
-    <string name="home_fragment_text">This is home Fragment</string>
-    <string name="dashboard_fragment_text">This is dashboard Fragment</string>
-    <string name="notifications_fragment_text">This is notifications Fragment</string>
     
     <!-- Accessibility strings -->
     <string name="selected_color">Selected Color</string>
@@ -140,4 +133,46 @@
     <string name="notification_channel_description">Notifications for upcoming tasks</string>
     <string name="notification_start_time">Starts at %1$s</string>
     <string name="notification_location">Location: %1$s</string>
+    <string name="notification_action_navigate">Navigate</string>
+    <string name="notification_action_open_url">Open Link</string>
+
+    <!-- Bottom navigation tabs -->
+    <string name="tab_calendar">Calendar</string>
+    <string name="tab_tasks">Tasks</string>
+    <string name="tab_stats">Stats</string>
+
+    <!-- Calendar sub-tabs -->
+    <string name="tab_daily">Daily</string>
+    <string name="tab_weekly">Weekly</string>
+    <string name="tab_monthly">Monthly</string>
+    <string name="tab_yearly">Yearly</string>
+
+    <!-- Screen titles -->
+    <string name="screen_tasks">Tasks</string>
+    <string name="screen_stats">Statistics</string>
+
+    <!-- Location picker strings -->
+    <string name="location_type_address">Address</string>
+    <string name="location_type_url">Link</string>
+    <string name="hint_location_url">https://zoom.us/j/…</string>
+    <string name="action_pick_on_map">Pick on map</string>
+    <string name="screen_map_picker">Pick Location</string>
+    <string name="map_picker_confirm">Confirm</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_start">Get started</string>
+    <string name="onboarding_page1_title">Your whole day on one screen</string>
+    <string name="onboarding_page1_text">MyTime is a calendar and a planner in one. Switch between day, week, month and year views.</string>
+    <string name="onboarding_page2_title">Tasks with details</string>
+    <string name="onboarding_page2_text">Set start and end time, a place on the map or a link, a price and a colour label. Add a task with the \"+\" button.</string>
+    <string name="onboarding_page3_title">Reminders on time</string>
+    <string name="onboarding_page3_text">MyTime will remind you 1 to 9 hours before a task starts - just pick when.</string>
+    <string name="onboarding_allow_notifications">Allow notifications</string>
+    <string name="onboarding_notifications_granted">Notifications are allowed</string>
+
+    <!-- Exact alarm permission -->
+    <string name="exact_alarm_warning">Reminders may not fire on time: the system does not let MyTime set exact alarms.</string>
+    <string name="exact_alarm_allow">Allow</string>
 </resources>

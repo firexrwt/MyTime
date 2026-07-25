@@ -36,7 +36,6 @@ android {
         jvmTarget = "11"
     }
     buildFeatures {
-        viewBinding = true
         compose = true
     }
     packaging {
@@ -68,17 +67,16 @@ dependencies {
 
     // Навигация
     implementation(libs.androidx.navigation.compose)
-    // implementation(libs.androidx.navigation.fragment) // Если не используете навигацию через фрагменты, можно удалить
 
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    implementation(libs.androidx.navigation.fragment)
     kapt(libs.androidx.room.compiler) // Используйте kapt для annotationProcessor если он объявлен так в libs.versions.toml
     // annotationProcessor(libs.androidx.room.compiler) // Если kapt не используется или объявлен отдельно
 
     // Другие ваши зависимости
     implementation(libs.material) // Google Material Components (для Material 1/2, если нужны)
+    implementation(libs.osmdroid)
     // implementation(libs.play.services.gcm) // Устаревшая библиотека, рассмотрите Firebase Cloud Messaging (FCM)
 
     // Тестовые зависимости

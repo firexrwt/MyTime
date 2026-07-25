@@ -1,11 +1,16 @@
 package com.firexrwtinc.mytime
 
-// import androidx.compose.runtime.livedata.observeAsState // Заменяем на collectAsStateWithLifecycle для Flow
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
@@ -39,17 +44,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CalendarViewDay
 import androidx.compose.material.icons.filled.CalendarViewWeek
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,19 +63,20 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -77,6 +84,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -101,6 +109,8 @@ import androidx.navigation.compose.rememberNavController
 import com.firexrwtinc.mytime.data.model.Task
 import com.firexrwtinc.mytime.data.repository.SettingsManager
 import com.firexrwtinc.mytime.ui.CreateTaskScreen
+import com.firexrwtinc.mytime.ui.MapPickerScreen
+import com.firexrwtinc.mytime.ui.onboarding.OnboardingScreen
 import com.firexrwtinc.mytime.ui.TaskViewModel
 import com.firexrwtinc.mytime.ui.settings.AppTheme
 import com.firexrwtinc.mytime.ui.settings.Language
@@ -140,19 +150,21 @@ fun hexToColor(hex: String): Color {
 }
 
 sealed class Screen(val route: String, val resourceId: Int? = null, val icon: ImageVector? = null) {
-    object DayView : Screen("day", R.string.screen_day, Icons.Filled.CalendarViewDay)
-    object WeekView : Screen("week", R.string.screen_week, Icons.Filled.CalendarViewWeek)
-    object MonthView : Screen("month", R.string.screen_month, Icons.Filled.CalendarMonth)
-    object YearView : Screen("year", R.string.screen_year, Icons.Filled.CalendarToday)
-    object CreateTask : Screen("create_task")
-    object Settings : Screen("settings", R.string.title_settings)
+    // Bottom nav tabs
+    object CalendarTab : Screen("calendar_tab", R.string.tab_calendar, Icons.Filled.CalendarMonth)
+    object TasksTab    : Screen("tasks_tab",    R.string.tab_tasks,    Icons.Filled.List)
+    object StatsTab    : Screen("stats_tab",    R.string.tab_stats,    Icons.Filled.BarChart)
+    object Settings    : Screen("settings",     R.string.title_settings, Icons.Filled.Settings)
+    // Detail screens (no bottom nav)
+    object CreateTask  : Screen("create_task")
+    object MapPicker   : Screen("map_picker",   R.string.screen_map_picker)
 }
 
 val navItems = listOf(
-    Screen.DayView,
-    Screen.WeekView,
-    Screen.MonthView,
-    Screen.YearView
+    Screen.CalendarTab,
+    Screen.TasksTab,
+    Screen.StatsTab,
+    Screen.Settings
 )
 
 const val BASE_HOUR_HEIGHT_DP = 60
@@ -189,15 +201,39 @@ class MainActivity : ComponentActivity() {
         }
         
         setContent {
-            // Observe theme changes and apply immediately
             val currentTheme by settingsManager.theme.collectAsStateWithLifecycle(
                 initialValue = settingsManager.getTheme()
             )
-            
+
             MyTimeTheme(appTheme = currentTheme) {
+                val onboardingCompleted by settingsManager.onboardingCompleted.collectAsStateWithLifecycle(
+                    initialValue = settingsManager.getOnboardingCompleted()
+                )
+
+                // First launch: show the intro instead of the main UI.
+                if (!onboardingCompleted) {
+                    OnboardingScreen { settingsManager.setOnboardingCompleted(true) }
+                    return@MyTimeTheme
+                }
+
+                // Request POST_NOTIFICATIONS permission on Android 13+.
+                // Only for users who already passed onboarding - it asks for the permission itself.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    val notifPermLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestPermission()
+                    ) { /* user made their choice, proceed */ }
+                    LaunchedEffect(Unit) {
+                        if (ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                }
+
                 val navController = rememberNavController()
-                val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-                val scope = rememberCoroutineScope()
                 val taskViewModel: TaskViewModel = viewModel(
                     factory = TaskViewModel.TaskViewModelFactory(application)
                 )
@@ -205,155 +241,87 @@ class MainActivity : ComponentActivity() {
 
                 var displayedDate by remember { mutableStateOf(LocalDate.now()) }
 
-                var topBarTitleStringRes by remember { mutableStateOf<Int?>(null) }
-                var topBarTitleFormatted by remember { mutableStateOf<String?>(null) }
+                val currentBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = currentBackStackEntry?.destination?.route
+                // Observed, not read via .value: the task arrives asynchronously after
+                // navigation, and a plain .value read never recomposes the title.
+                val editedTask by taskViewModel.selectedTask.observeAsState()
+                val isDetailScreen = currentRoute?.startsWith(Screen.CreateTask.route) == true ||
+                        currentRoute?.startsWith(Screen.MapPicker.route) == true
 
-
-                val dayFormatter = remember { DateTimeFormatter.ofPattern("d MMMM uuuu", Locale.getDefault()) }
-                val monthFormatter = remember { DateTimeFormatter.ofPattern("MMMM uuuu", Locale.getDefault()) }
-                val yearFormatter = remember { DateTimeFormatter.ofPattern("uuuu", Locale.getDefault()) }
-
-                val updateTitle: (Screen, LocalDate) -> Unit = { screen, date ->
-                    topBarTitleStringRes = null
-                    topBarTitleFormatted = null
-                    when (screen) {
-                        is Screen.DayView -> topBarTitleFormatted = date.format(dayFormatter)
-                        is Screen.WeekView -> {
-                            val firstDayOfWeekDevice = java.time.temporal.WeekFields.of(Locale.getDefault()).firstDayOfWeek
-                            val startOfWeek = date.with(java.time.temporal.TemporalAdjusters.previousOrSame(firstDayOfWeekDevice))
-                            val endOfWeek = startOfWeek.plusDays(6)
-                            val weekNumber = startOfWeek.get(java.time.temporal.WeekFields.of(Locale.getDefault()).weekOfWeekBasedYear())
-                            val weekAbbr = application.getString(R.string.week_abbreviation)
-
-                            topBarTitleFormatted = if (startOfWeek.year == endOfWeek.year) {
-                                if (startOfWeek.month == endOfWeek.month) {
-                                    "${startOfWeek.dayOfMonth} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMMM yy"))} ($weekAbbr $weekNumber)"
-                                } else {
-                                    "${startOfWeek.format(DateTimeFormatter.ofPattern("d MMM"))} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMMM yy"))} ($weekAbbr $weekNumber)"
-                                }
-                            } else {
-                                "${startOfWeek.format(DateTimeFormatter.ofPattern("d MMM yy"))} - ${endOfWeek.format(DateTimeFormatter.ofPattern("d MMM yy"))} ($weekAbbr $weekNumber)"
-                            }
-                        }
-                        is Screen.MonthView -> topBarTitleFormatted = YearMonth.from(date).format(monthFormatter)
-                        is Screen.YearView -> topBarTitleFormatted = date.format(yearFormatter)
-                        is Screen.CreateTask -> {
-                            val editingTask = taskViewModel.selectedTask.value // ObserveAsState не нужен здесь
-                            topBarTitleStringRes = if (editingTask != null && editingTask.id != 0L) {
-                                R.string.title_edit_task
-                            } else {
-                                R.string.title_new_task
-                            }
-                        }
-                        is Screen.Settings -> topBarTitleStringRes = R.string.title_settings
-                    }
-                }
-
-                LaunchedEffect(navController.currentBackStackEntryAsState().value, displayedDate, taskViewModel.selectedTask.value) {
-                    val currentRoute = navController.currentBackStackEntry?.destination?.route
-                    val screenForTitleUpdate = if (currentRoute?.startsWith(Screen.CreateTask.route.split("?").first()) == true) {
-                        Screen.CreateTask
-                    } else {
-                        navItems.find { it.route == currentRoute } ?: Screen.DayView
-                    }
-                    updateTitle(screenForTitleUpdate, displayedDate)
-                }
-
-                ModalNavigationDrawer(drawerState = drawerState, drawerContent = { 
-                    ModalDrawerSheet {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = stringResource(R.string.app_name),
-                                style = MaterialTheme.typography.headlineSmall,
-                                modifier = Modifier.padding(bottom = 16.dp)
-                            )
-                            
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        scope.launch {
-                                            drawerState.close()
-                                            navController.navigate(Screen.Settings.route)
-                                        }
-                                    }
-                                    .padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Settings,
-                                    contentDescription = stringResource(R.string.menu_settings),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Text(
-                                    text = stringResource(R.string.menu_settings),
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
-                        }
-                    }
-                }) {
-                    Scaffold(
-                        snackbarHost = { SnackbarHost(snackbarHostState) },
-                        topBar = {
+                @OptIn(ExperimentalMaterial3Api::class)
+                Scaffold(
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
+                    topBar = {
+                        if (isDetailScreen) {
                             CenterAlignedTopAppBar(
                                 title = {
-                                    val titleText = topBarTitleStringRes?.let { stringResource(id = it) }
-                                        ?: topBarTitleFormatted
-                                        ?: ""
-                                    Text(titleText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    val titleRes = when {
+                                        currentRoute?.startsWith(Screen.CreateTask.route) == true ->
+                                            if (editedTask != null && editedTask?.id != 0L)
+                                                R.string.title_edit_task else R.string.title_new_task
+                                        else -> R.string.screen_map_picker
+                                    }
+                                    Text(stringResource(titleRes), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 },
                                 navigationIcon = {
-                                    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
-                                    if (currentRoute?.startsWith(Screen.CreateTask.route.split("?").first()) == true ||
-                                        currentRoute == Screen.Settings.route ||
-                                        (navController.previousBackStackEntry != null && navItems.none { it.route == currentRoute })) {
-                                        IconButton(onClick = { navController.navigateUp() }) {
-                                            Icon(Icons.Filled.ArrowBackIosNew, stringResource(R.string.desc_back))
-                                        }
-                                    } else {
-                                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                            Icon(Icons.Filled.Menu, stringResource(R.string.desc_open_drawer))
-                                        }
+                                    IconButton(onClick = { navController.navigateUp() }) {
+                                        Icon(Icons.Filled.ArrowBackIosNew, stringResource(R.string.desc_back))
                                     }
                                 }
                             )
-                        },
-                        bottomBar = {
-                            val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
-                            if (currentRoute?.startsWith(Screen.CreateTask.route.split("?").first()) != true && 
-                                currentRoute != Screen.Settings.route) {
-                                NavigationBar {
-                                    val currentDestination = navController.currentBackStackEntryAsState().value?.destination
-                                    navItems.forEach { screen ->
-                                        NavigationBarItem(
-                                            icon = { Icon(screen.icon!!, contentDescription = stringResource(screen.resourceId!!)) },
-                                            label = { Text(stringResource(screen.resourceId!!)) },
-                                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                                            onClick = {
-                                                navController.navigate(screen.route) {
-                                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                                    launchSingleTop = true
-                                                    restoreState = true
-                                                }
-                                            }
+                        } else {
+                            TopAppBar(
+                                title = {
+                                    Text(
+                                        text = stringResource(R.string.app_name),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                actions = {
+                                    IconButton(onClick = { /* TODO: search */ }) {
+                                        Icon(
+                                            Icons.Filled.Search,
+                                            contentDescription = stringResource(R.string.desc_search),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
+                            )
+                        }
+                    },
+                    bottomBar = {
+                        if (!isDetailScreen) {
+                            NavigationBar {
+                                val currentDestination = currentBackStackEntry?.destination
+                                navItems.forEach { screen ->
+                                    NavigationBarItem(
+                                        icon = { Icon(screen.icon!!, contentDescription = stringResource(screen.resourceId!!)) },
+                                        label = { Text(stringResource(screen.resourceId!!)) },
+                                        selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                                        onClick = {
+                                            navController.navigate(screen.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
-                    ) { innerPadding ->
-                        AppNavHost(
-                            navController = navController,
-                            taskViewModel = taskViewModel,
-                            innerPadding = innerPadding,
-                            displayedDate = displayedDate,
-                            onDateChange = { displayedDate = it },
-                            updateTitle = updateTitle,
-                            snackbarHostState = snackbarHostState
-                        )
                     }
+                ) { innerPadding ->
+                    AppNavHost(
+                        navController = navController,
+                        taskViewModel = taskViewModel,
+                        innerPadding = innerPadding,
+                        displayedDate = displayedDate,
+                        onDateChange = { displayedDate = it },
+                        snackbarHostState = snackbarHostState
+                    )
                 }
             }
         }
@@ -367,52 +335,31 @@ fun AppNavHost(
     innerPadding: PaddingValues,
     displayedDate: LocalDate,
     onDateChange: (LocalDate) -> Unit,
-    updateTitle: (Screen, LocalDate) -> Unit,
     snackbarHostState: SnackbarHostState
 ) {
     NavHost(
         navController = navController,
-        startDestination = Screen.DayView.route,
+        startDestination = Screen.CalendarTab.route,
         modifier = Modifier.padding(innerPadding)
     ) {
-        composable(Screen.DayView.route) {
-            DayScreen(
-                currentDate = displayedDate,
+        composable(Screen.CalendarTab.route) {
+            CalendarTabScreen(
+                displayedDate = displayedDate,
                 onDateChange = onDateChange,
-                updateTitle = { date -> updateTitle(Screen.DayView, date) },
                 taskViewModel = taskViewModel,
                 navController = navController,
                 snackbarHostState = snackbarHostState
             )
         }
-        composable(Screen.WeekView.route) {
-            WeekScreen(
-                currentDate = displayedDate,
-                onDateChange = onDateChange,
-                updateTitle = { date -> updateTitle(Screen.WeekView, date) },
-                taskViewModel = taskViewModel,
-                navController = navController
-            )
+        composable(Screen.TasksTab.route) {
+            TasksTabScreen()
         }
-        composable(Screen.MonthView.route) {
-            MonthScreen(
-                currentDate = displayedDate,
-                onDateChange = onDateChange,
-                updateTitle = { date -> updateTitle(Screen.MonthView, date) },
-                navController = navController
-            )
+        composable(Screen.StatsTab.route) {
+            StatsTabScreen()
         }
-        composable(Screen.YearView.route) {
-            YearScreen(
-                currentDate = displayedDate,
-                onDateChange = onDateChange,
-                updateTitle = { date -> updateTitle(Screen.YearView, date) },
-                onMonthSelected = { yearMonth ->
-                    onDateChange(yearMonth.atDay(1))
-                    navController.navigate(Screen.MonthView.route) {
-                        popUpTo(Screen.MonthView.route) { inclusive = true }
-                    }
-                }
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onNavigateBack = { navController.navigateUp() }
             )
         }
         composable(Screen.CreateTask.route + "?date={date}&taskId={taskId}") { backStackEntry ->
@@ -434,9 +381,13 @@ fun AppNavHost(
                 taskIdToEdit = taskId
             )
         }
-        composable(Screen.Settings.route) {
-            SettingsScreen(
-                onNavigateBack = { navController.navigateUp() }
+        composable(Screen.MapPicker.route + "?lat={lat}&lng={lng}") { backStackEntry ->
+            val lat = backStackEntry.arguments?.getString("lat")?.toDoubleOrNull() ?: 0.0
+            val lng = backStackEntry.arguments?.getString("lng")?.toDoubleOrNull() ?: 0.0
+            MapPickerScreen(
+                navController = navController,
+                initialLat = lat,
+                initialLng = lng
             )
         }
     }
@@ -481,22 +432,15 @@ fun TaskDetailDialog(task: Task, onDismiss: () -> Unit) {
 fun DayScreen(
     currentDate: LocalDate,
     onDateChange: (LocalDate) -> Unit,
-    updateTitle: (LocalDate) -> Unit,
     taskViewModel: TaskViewModel,
     navController: NavHostController,
     snackbarHostState: SnackbarHostState
 ) {
-    // Используем LaunchedEffect для вызова setCurrentDayForObserver при изменении currentDate
     LaunchedEffect(currentDate) {
-        updateTitle(currentDate)
-        taskViewModel.setCurrentDayForObserver(currentDate) // Обновляем дату в ViewModel
+        taskViewModel.setCurrentDayForObserver(currentDate)
     }
 
-    // Собираем задачи из StateFlow
     val tasksForDay: List<Task> by taskViewModel.tasksForDateFlow.collectAsStateWithLifecycle()
-
-    val dayOfWeekFormatter = remember { DateTimeFormatter.ofPattern("E", Locale.getDefault()) }
-    val dayOfMonthFormatter = remember { DateTimeFormatter.ofPattern("dd", Locale.getDefault()) }
 
     var showTaskDetailDialog by remember { mutableStateOf<Task?>(null) }
     var showDeleteConfirmDialog by remember { mutableStateOf<Task?>(null) }
@@ -504,33 +448,29 @@ fun DayScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(
+            // Date heading
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                IconButton(onClick = { onDateChange(currentDate.minusDays(1)) }) {
-                    Icon(Icons.Filled.ArrowBackIosNew, contentDescription = stringResource(R.string.desc_previous_day))
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = currentDate.format(dayOfWeekFormatter).uppercase(Locale.getDefault()),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = currentDate.format(dayOfMonthFormatter),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                IconButton(onClick = { onDateChange(currentDate.plusDays(1)) }) {
-                    Icon(Icons.Filled.ArrowForwardIos, contentDescription = stringResource(R.string.desc_next_day))
-                }
+                Text(
+                    text = currentDate.dayOfWeek.getDisplayName(JavaTextStyle.FULL, Locale.getDefault())
+                        .replaceFirstChar { it.titlecase(Locale.getDefault()) },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = currentDate.format(DateTimeFormatter.ofPattern("d MMMM uuuu", Locale.getDefault())),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold
+                )
             }
+            // Week strip
+            WeekStrip(
+                currentDate = currentDate,
+                onDateSelected = onDateChange
+            )
             HourTimeline(
                 currentDate = currentDate,
                 tasks = tasksForDay,
@@ -767,26 +707,37 @@ fun HourLabelsColumn(
 @Composable
 fun TaskEntry(task: Task, modifier: Modifier = Modifier) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
-    Box(
+    val accentColor = hexToColor(task.colorHex)
+
+    Row(
         modifier = modifier
-            .background(hexToColor(task.colorHex).copy(alpha = 0.9f), shape = MaterialTheme.shapes.small)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-            .border(1.dp, Color.Black.copy(alpha = 0.2f), MaterialTheme.shapes.small)
+            .clip(MaterialTheme.shapes.small)
+            .background(accentColor.copy(alpha = 0.10f))
     ) {
-        Column {
+        // 4dp accent bar on the left
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .fillMaxHeight()
+                .background(accentColor)
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
             Text(
                 text = task.title,
                 style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "${task.startTime.format(timeFormatter)} - ${task.endTime?.format(timeFormatter) ?: ""}",
+                text = "${task.startTime.format(timeFormatter)} — ${task.endTime?.format(timeFormatter) ?: ""}",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.85f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -801,7 +752,6 @@ fun DayScreenPreview() {
         DayScreen(
             currentDate = LocalDate.now(),
             onDateChange = {},
-            updateTitle = {},
             taskViewModel = TaskViewModel(app),
             navController = rememberNavController(),
             snackbarHostState = remember { SnackbarHostState() }
@@ -814,12 +764,11 @@ fun DayScreenPreview() {
 fun WeekScreen(
     currentDate: LocalDate,
     onDateChange: (LocalDate) -> Unit,
-    updateTitle: (LocalDate) -> Unit,
     taskViewModel: TaskViewModel,
-    navController: NavHostController
+    navController: NavHostController,
+    onNavigateToDayView: (LocalDate) -> Unit = {}
 ) {
     LaunchedEffect(currentDate) {
-        updateTitle(currentDate)
         taskViewModel.loadTasksForWeek(currentDate)
     }
 
@@ -875,10 +824,7 @@ fun WeekScreen(
                     modifier = Modifier.weight(1f),
                     onDoubleClick = { selectedDate ->
                         onDateChange(selectedDate)
-                        navController.navigate(Screen.DayView.route) {
-                            popUpTo(navController.graph.findStartDestination().id)
-                            launchSingleTop = true
-                        }
+                        onNavigateToDayView(selectedDate)
                     }
                 )
             }
@@ -962,11 +908,10 @@ fun TaskItemWeek(task: Task) {
 fun MonthScreen(
     currentDate: LocalDate,
     onDateChange: (LocalDate) -> Unit,
-    updateTitle: (LocalDate) -> Unit,
-    navController: NavHostController
+    navController: NavHostController,
+    onNavigateToDayView: (LocalDate) -> Unit = {}
 ) {
     val currentYearMonth = remember(currentDate) { YearMonth.from(currentDate) }
-    LaunchedEffect(currentYearMonth) { updateTitle(currentYearMonth.atDay(1)) }
     val daysOfWeek = remember { getDaysOfWeek() }
     val calendarDays = remember(currentYearMonth) { getDaysForMonthCalendar(currentYearMonth) }
     Column(modifier = Modifier.fillMaxSize()) {
@@ -992,10 +937,7 @@ fun MonthScreen(
                     onDoubleClick = { doubleClickedDate ->
                         if (doubleClickedDate != null) {
                             onDateChange(doubleClickedDate)
-                            navController.navigate(Screen.DayView.route) {
-                                popUpTo(navController.graph.findStartDestination().id)
-                                launchSingleTop = true
-                            }
+                            onNavigateToDayView(doubleClickedDate)
                         }
                     }
                 )
@@ -1005,9 +947,8 @@ fun MonthScreen(
 }
 
 @Composable
-fun YearScreen(currentDate: LocalDate, onDateChange: (LocalDate) -> Unit, updateTitle: (LocalDate) -> Unit, onMonthSelected: (YearMonth) -> Unit) {
+fun YearScreen(currentDate: LocalDate, onDateChange: (LocalDate) -> Unit, onMonthSelected: (YearMonth) -> Unit) {
     val currentYear = remember(currentDate) { currentDate.year }
-    LaunchedEffect(currentYear) { updateTitle(LocalDate.of(currentYear, 1, 1)) }
     val months = remember(currentYear) { (1..12).map { YearMonth.of(currentYear, it) } }
     val monthNameFormatter = remember { DateTimeFormatter.ofPattern("LLLL", Locale.getDefault()) }
     Column(modifier = Modifier.fillMaxSize()) {
@@ -1111,6 +1052,185 @@ fun DayCell(
                     isToday -> MaterialTheme.colorScheme.primary
                     else -> MaterialTheme.colorScheme.onSurface
                 }
+            )
+        }
+    }
+}
+
+// ─── Week Strip ───────────────────────────────────────────────────────────────
+
+@Composable
+fun WeekStrip(
+    currentDate: LocalDate,
+    onDateSelected: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val weekStart = remember(currentDate) {
+        currentDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    }
+    val days = remember(weekStart) { List(7) { weekStart.plusDays(it.toLong()) } }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceAround
+    ) {
+        days.forEach { day ->
+            val isSelected = day == currentDate
+            val isToday = day == LocalDate.now()
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable { onDateSelected(day) }
+            ) {
+                Text(
+                    text = day.dayOfWeek.getDisplayName(JavaTextStyle.NARROW, Locale.getDefault()),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(
+                            color = when {
+                                isSelected -> MaterialTheme.colorScheme.primary
+                                isToday -> MaterialTheme.colorScheme.primaryContainer
+                                else -> Color.Transparent
+                            },
+                            shape = CircleShape
+                        )
+                ) {
+                    Text(
+                        text = day.dayOfMonth.toString(),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
+                        color = when {
+                            isSelected -> MaterialTheme.colorScheme.onPrimary
+                            isToday -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─── Calendar Tab Screen ──────────────────────────────────────────────────────
+
+@Composable
+fun CalendarTabScreen(
+    displayedDate: LocalDate,
+    onDateChange: (LocalDate) -> Unit,
+    taskViewModel: TaskViewModel,
+    navController: NavHostController,
+    snackbarHostState: SnackbarHostState
+) {
+    var selectedTab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScrollableTabRow(
+            selectedTabIndex = selectedTab,
+            edgePadding = 16.dp,
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            listOf(
+                R.string.tab_daily,
+                R.string.tab_weekly,
+                R.string.tab_monthly,
+                R.string.tab_yearly
+            ).forEachIndexed { index, labelRes ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = { selectedTab = index },
+                    text = { Text(stringResource(labelRes)) }
+                )
+            }
+        }
+
+        Box(modifier = Modifier.weight(1f)) {
+            when (selectedTab) {
+                0 -> DayScreen(
+                    currentDate = displayedDate,
+                    onDateChange = onDateChange,
+                    taskViewModel = taskViewModel,
+                    navController = navController,
+                    snackbarHostState = snackbarHostState
+                )
+                1 -> WeekScreen(
+                    currentDate = displayedDate,
+                    onDateChange = onDateChange,
+                    taskViewModel = taskViewModel,
+                    navController = navController,
+                    onNavigateToDayView = { date -> onDateChange(date); selectedTab = 0 }
+                )
+                2 -> MonthScreen(
+                    currentDate = displayedDate,
+                    onDateChange = onDateChange,
+                    navController = navController,
+                    onNavigateToDayView = { date -> onDateChange(date); selectedTab = 0 }
+                )
+                3 -> YearScreen(
+                    currentDate = displayedDate,
+                    onDateChange = onDateChange,
+                    onMonthSelected = { yearMonth ->
+                        onDateChange(yearMonth.atDay(1))
+                        selectedTab = 2
+                    }
+                )
+            }
+        }
+    }
+}
+
+// ─── Tasks Tab Screen ─────────────────────────────────────────────────────────
+
+@Composable
+fun TasksTabScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                Icons.Filled.List,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                stringResource(R.string.tab_tasks),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+// ─── Stats Tab Screen ─────────────────────────────────────────────────────────
+
+@Composable
+fun StatsTabScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                Icons.Filled.BarChart,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                stringResource(R.string.tab_stats),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

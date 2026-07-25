@@ -26,33 +26,46 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.EuroSymbol
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.ListAlt
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Title
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,8 +78,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
 import com.firexrwtinc.mytime.R
+import com.firexrwtinc.mytime.Screen
+import com.firexrwtinc.mytime.data.model.LocationType
 import com.firexrwtinc.mytime.data.model.Task
 import com.firexrwtinc.mytime.hexToColor
 import com.firexrwtinc.mytime.ui.TaskViewModel
@@ -86,39 +104,64 @@ fun CreateTaskScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val lifecycleOwner = LocalLifecycleOwner.current
 
+    // Exact alarms can be revoked by the system/user at any time; re-check on every resume,
+    // so returning from the system settings screen immediately hides the warning.
+    var canScheduleExact by remember { mutableStateOf(taskViewModel.canScheduleExactAlarms()) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                canScheduleExact = taskViewModel.canScheduleExactAlarms()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // formInitialized persists through child navigation (MapPickerScreen) but resets when
+    // this back stack entry is destroyed (user navigates back from CreateTask).
+    var formInitialized by rememberSaveable { mutableStateOf(false) }
     var taskTitle by remember { mutableStateOf("") }
     var taskDescription by remember { mutableStateOf("") }
     var taskDate by remember { mutableStateOf(selectedDateArg) }
     var taskStartTime by remember { mutableStateOf(LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(1)) }
     var taskEndTime by remember { mutableStateOf(LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(2)) }
     var taskLocation by remember { mutableStateOf("") }
+    var taskLocationType by remember { mutableStateOf(LocationType.NONE) }
+    var taskLocationLat by remember { mutableStateOf<Double?>(null) }
+    var taskLocationLng by remember { mutableStateOf<Double?>(null) }
     var taskEquipment by remember { mutableStateOf("") }
     var taskPriceString by remember { mutableStateOf("") }
     var selectedReminderHours by remember { mutableStateOf<Int?>(null) }
-    var selectedColorHex by remember { mutableStateOf("#82B1FF") } // Default Blue A100
+    var selectedColorHex by remember { mutableStateOf("#82B1FF") }
 
     val isEditing = taskIdToEdit != 0L
     val existingTaskState by taskViewModel.selectedTask.observeAsState()
 
-    // Этот LaunchedEffect будет реагировать на изменение taskIdToEdit
-    // и загружать задачу, если мы в режиме редактирования.
+    // Initialize form fields only once per navigation instance.
+    // formInitialized persists through child navigation (e.g. MapPickerScreen) but resets
+    // when this back stack entry is destroyed (navigating back from CreateTask).
     LaunchedEffect(taskIdToEdit) {
+        if (formInitialized) return@LaunchedEffect
+        formInitialized = true
         if (isEditing) {
             taskViewModel.loadTaskById(taskIdToEdit)
         } else {
-            // Сброс полей для новой задачи, установка переданной даты
             taskTitle = ""
             taskDescription = ""
             taskDate = selectedDateArg
             taskStartTime = LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(1)
             taskEndTime = LocalTime.now().withMinute(0).withSecond(0).withNano(0).plusHours(2)
             taskLocation = ""
+            taskLocationType = LocationType.NONE
+            taskLocationLat = null
+            taskLocationLng = null
             taskEquipment = ""
             taskPriceString = ""
             selectedReminderHours = null
             selectedColorHex = "#82B1FF"
-            taskViewModel.clearSelectedTask() // Очищаем selectedTask во ViewModel
+            taskViewModel.clearSelectedTask()
         }
     }
 
@@ -133,6 +176,9 @@ fun CreateTaskScreen(
                 taskStartTime = task.startTime
                 taskEndTime = task.endTime
                 taskLocation = task.location ?: ""
+                taskLocationType = task.locationType
+                taskLocationLat = task.locationLat
+                taskLocationLng = task.locationLng
                 taskEquipment = task.equipment ?: ""
                 taskPriceString = task.price?.toString() ?: ""
                 selectedReminderHours = task.reminderHoursBefore
@@ -141,6 +187,37 @@ fun CreateTaskScreen(
         }
     }
 
+
+    // Получаем результат из MapPickerScreen через savedStateHandle
+    val mapResultLat by navController.currentBackStackEntry
+        ?.savedStateHandle
+        ?.getLiveData<Double>("location_lat")
+        ?.observeAsState() ?: remember { mutableStateOf(null) }
+    val mapResultLng by navController.currentBackStackEntry
+        ?.savedStateHandle
+        ?.getLiveData<Double>("location_lng")
+        ?.observeAsState() ?: remember { mutableStateOf(null) }
+    val mapResultAddress by navController.currentBackStackEntry
+        ?.savedStateHandle
+        ?.getLiveData<String>("location_address")
+        ?.observeAsState() ?: remember { mutableStateOf(null) }
+
+    LaunchedEffect(mapResultLat, mapResultLng, mapResultAddress) {
+        val lat = mapResultLat
+        val lng = mapResultLng
+        val address = mapResultAddress
+        if (lat != null && lng != null && address != null) {
+            taskLocationLat = lat
+            taskLocationLng = lng
+            taskLocation = address
+            taskLocationType = LocationType.ADDRESS
+            navController.currentBackStackEntry?.savedStateHandle?.apply {
+                remove<Double>("location_lat")
+                remove<Double>("location_lng")
+                remove<String>("location_address")
+            }
+        }
+    }
 
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd MMMM yyyy") }
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
@@ -217,6 +294,9 @@ fun CreateTaskScreen(
                         startTime = taskStartTime,
                         endTime = taskEndTime,
                         location = taskLocation.takeIf { it.isNotBlank() },
+                        locationType = taskLocationType,
+                        locationLat = taskLocationLat,
+                        locationLng = taskLocationLng,
                         equipment = taskEquipment.takeIf { it.isNotBlank() },
                         price = taskPriceString.toDoubleOrNull(),
                         reminderHoursBefore = selectedReminderHours,
@@ -330,16 +410,88 @@ fun CreateTaskScreen(
                 )
             }
 
-            OutlinedTextField(
-                value = taskLocation,
-                onValueChange = { taskLocation = it },
-                label = { Text(stringResource(R.string.label_location)) },
-                leadingIcon = { Icon(Icons.Outlined.LocationOn, contentDescription = null)},
-                placeholder = { Text(stringResource(R.string.hint_location)) },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-                // TODO: Implement Google Maps Place Picker for location
+            // Выбор типа локации
+            Text(
+                stringResource(R.string.label_location),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(top = 4.dp)
             )
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                LocationType.entries.filter { it != LocationType.NONE }.forEachIndexed { index, type ->
+                    SegmentedButton(
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = 2),
+                        onClick = {
+                            taskLocationType = if (taskLocationType == type) LocationType.NONE else type
+                            if (taskLocationType == LocationType.URL) {
+                                taskLocationLat = null
+                                taskLocationLng = null
+                            }
+                        },
+                        selected = taskLocationType == type,
+                        label = {
+                            Text(
+                                when (type) {
+                                    LocationType.ADDRESS -> stringResource(R.string.location_type_address)
+                                    LocationType.URL -> stringResource(R.string.location_type_url)
+                                    else -> ""
+                                }
+                            )
+                        },
+                        icon = {
+                            Icon(
+                                imageVector = when (type) {
+                                    LocationType.ADDRESS -> Icons.Outlined.LocationOn
+                                    LocationType.URL -> Icons.Outlined.Link
+                                    else -> Icons.Outlined.LocationOn
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    )
+                }
+            }
+
+            // Поле адреса или ссылки в зависимости от типа
+            when (taskLocationType) {
+                LocationType.ADDRESS -> {
+                    OutlinedTextField(
+                        value = taskLocation,
+                        onValueChange = { taskLocation = it },
+                        label = { Text(stringResource(R.string.location_type_address)) },
+                        leadingIcon = { Icon(Icons.Outlined.LocationOn, contentDescription = null) },
+                        placeholder = { Text(stringResource(R.string.hint_location)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        readOnly = taskLocationLat != null
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            navController.navigate(
+                                Screen.MapPicker.route +
+                                    "?lat=${taskLocationLat ?: 0.0}&lng=${taskLocationLng ?: 0.0}"
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Map, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.action_pick_on_map))
+                    }
+                }
+                LocationType.URL -> {
+                    OutlinedTextField(
+                        value = taskLocation,
+                        onValueChange = { taskLocation = it },
+                        label = { Text(stringResource(R.string.location_type_url)) },
+                        leadingIcon = { Icon(Icons.Outlined.Link, contentDescription = null) },
+                        placeholder = { Text(stringResource(R.string.hint_location_url)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                    )
+                }
+                LocationType.NONE -> { /* поле скрыто */ }
+            }
 
             OutlinedTextField(
                 value = taskEquipment,
@@ -390,6 +542,58 @@ fun CreateTaskScreen(
                                 reminderDropdownExpanded = false
                             }
                         )
+                    }
+                }
+            }
+
+            // Без разрешения на точные будильники напоминание может не прийти вовремя -
+            // предупреждаем сразу, а не когда уведомление уже не сработало.
+            if (selectedReminderHours != null && !canScheduleExact) {
+                val exactAlarmIntent = taskViewModel.getExactAlarmPermissionIntent()
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Outlined.Warning,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = stringResource(R.string.exact_alarm_warning),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (exactAlarmIntent != null) {
+                            TextButton(
+                                onClick = {
+                                    try {
+                                        context.startActivity(exactAlarmIntent)
+                                    } catch (e: Exception) {
+                                        // На некоторых прошивках такого системного экрана нет -
+                                        // молча остаёмся на месте, приложение не роняем.
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                context.getString(R.string.exact_alarm_warning)
+                                            )
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            ) {
+                                Text(stringResource(R.string.exact_alarm_allow))
+                            }
+                        }
                     }
                 }
             }

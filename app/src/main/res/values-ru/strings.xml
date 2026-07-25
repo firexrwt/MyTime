@@ -5,9 +5,6 @@
     <string name="action_close">Закрыть</string>
     <string name="action_yes">Да</string>
     <string name="action_cancel">Отмена</string>
-    <string name="title_home">Главная</string>
-    <string name="title_dashboard">Панель</string>
-    <string name="title_notifications">Уведомления</string>
     <string name="delete_confirmation_title">Подтверждение</string>
     <string name="delete_confirmation_message">Вы уверены, что хотите удалить задачу \"%1$s\"?</string>
     <string name="task_deleted_message">Задача удалена</string>
@@ -25,6 +22,7 @@
     <string name="desc_previous_day">Предыдущий день</string>
     <string name="desc_next_day">Следующий день</string>
     <string name="desc_back">Назад</string>
+    <string name="desc_search">Поиск</string>
     <string name="desc_open_drawer">Открыть меню</string>
     <string name="desc_add_task">Добавить задачу</string>
     <string name="desc_previous_week">Предыдущая неделя</string>
@@ -72,11 +70,6 @@
     <string name="pending_task_singular">ожидающая задача</string>
     <string name="pending_tasks_few">ожидающие задачи</string>
     <string name="pending_tasks_many">ожидающих задач</string>
-    
-    <!-- Fragment placeholder texts -->
-    <string name="home_fragment_text">Это фрагмент главной страницы</string>
-    <string name="dashboard_fragment_text">Это фрагмент панели управления</string>
-    <string name="notifications_fragment_text">Это фрагмент уведомлений</string>
     
     <!-- Accessibility strings -->
     <string name="selected_color">Выбранный цвет</string>
@@ -134,4 +127,52 @@
     <string name="settings_version">Версия</string>
     <string name="settings_about">О программе</string>
     <string name="settings_about_description">Узнать больше о MyTime</string>
+
+    <!-- Notification system strings -->
+    <string name="notification_channel_name">Напоминания о задачах</string>
+    <string name="notification_channel_description">Уведомления о предстоящих задачах</string>
+    <string name="notification_start_time">Начало в %1$s</string>
+    <string name="notification_location">Место: %1$s</string>
+    <string name="notification_action_navigate">Маршрут</string>
+    <string name="notification_action_open_url">Открыть ссылку</string>
+
+    <!-- Bottom navigation tabs -->
+    <string name="tab_calendar">Календарь</string>
+    <string name="tab_tasks">Задачи</string>
+    <string name="tab_stats">Статистика</string>
+
+    <!-- Calendar sub-tabs -->
+    <string name="tab_daily">День</string>
+    <string name="tab_weekly">Неделя</string>
+    <string name="tab_monthly">Месяц</string>
+    <string name="tab_yearly">Год</string>
+
+    <!-- Screen titles -->
+    <string name="screen_tasks">Задачи</string>
+    <string name="screen_stats">Статистика</string>
+
+    <!-- Location picker strings -->
+    <string name="location_type_address">Адрес</string>
+    <string name="location_type_url">Ссылка</string>
+    <string name="hint_location_url">https://zoom.us/j/…</string>
+    <string name="action_pick_on_map">Выбрать на карте</string>
+    <string name="screen_map_picker">Выбор места</string>
+    <string name="map_picker_confirm">Готово</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_skip">Пропустить</string>
+    <string name="onboarding_next">Далее</string>
+    <string name="onboarding_start">Начать</string>
+    <string name="onboarding_page1_title">Весь день на одном экране</string>
+    <string name="onboarding_page1_text">MyTime - календарь и планировщик сразу. Смотрите дела по дню, неделе, месяцу и году.</string>
+    <string name="onboarding_page2_title">Задачи с деталями</string>
+    <string name="onboarding_page2_text">Время начала и конца, место на карте или ссылка, цена и цвет-метка. Новая задача - по кнопке \"+\".</string>
+    <string name="onboarding_page3_title">Напомним вовремя</string>
+    <string name="onboarding_page3_text">MyTime напомнит за 1-9 часов до начала задачи - выберите, за сколько.</string>
+    <string name="onboarding_allow_notifications">Разрешить уведомления</string>
+    <string name="onboarding_notifications_granted">Уведомления разрешены</string>
+
+    <!-- Exact alarm permission -->
+    <string name="exact_alarm_warning">Напоминания могут не сработать вовремя: система не разрешает MyTime ставить точные будильники.</string>
+    <string name="exact_alarm_allow">Разрешить</string>
 </resources>

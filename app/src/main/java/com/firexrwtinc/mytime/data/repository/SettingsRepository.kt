@@ -47,7 +47,11 @@ class SettingsRepository(context: Context) {
     
     private val _showWeekends = MutableStateFlow(getShowWeekends())
     val showWeekends: Flow<Boolean> = _showWeekends.asStateFlow()
-    
+
+    // Onboarding setting
+    private val _onboardingCompleted = MutableStateFlow(getOnboardingCompleted())
+    val onboardingCompleted: Flow<Boolean> = _onboardingCompleted.asStateFlow()
+
     // Language methods
     fun getLanguage(): Language {
         val languageName = sharedPreferences.getString(KEY_LANGUAGE, Language.SYSTEM.name) ?: Language.SYSTEM.name
@@ -155,7 +159,19 @@ class SettingsRepository(context: Context) {
             .apply()
         _showWeekends.value = show
     }
-    
+
+    // Onboarding methods
+    fun getOnboardingCompleted(): Boolean {
+        return sharedPreferences.getBoolean(KEY_ONBOARDING_COMPLETED, false)
+    }
+
+    fun setOnboardingCompleted(completed: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(KEY_ONBOARDING_COMPLETED, completed)
+            .apply()
+        _onboardingCompleted.value = completed
+    }
+
     companion object {
         private const val SETTINGS_PREFERENCES_NAME = "mytime_settings"
         private const val KEY_LANGUAGE = "language"
@@ -166,5 +182,6 @@ class SettingsRepository(context: Context) {
         private const val KEY_DEFAULT_TASK_DURATION = "default_task_duration"
         private const val KEY_DEFAULT_REMINDER_HOURS = "default_reminder_hours"
         private const val KEY_SHOW_WEEKENDS = "show_weekends"
+        private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
     }
 }

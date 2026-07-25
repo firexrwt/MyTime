@@ -3,9 +3,9 @@ package com.firexrwtinc.mytime.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.firexrwtinc.mytime.data.database.AppDatabase
 import com.firexrwtinc.mytime.data.model.Task
@@ -15,8 +15,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -36,14 +37,18 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         taskDao.getTasksForDate(date)
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Lazily,
+        // WhileSubscribed: drops the Room observer when no screen is watching (e.g. app in
+        // background) instead of keeping a cursor open until onCleared.
+        started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList()
     )
     fun setCurrentDayForObserver(newDate: LocalDate) {
         _currentDayScreenDate.value = newDate
     }
-    private val _selectedTask = MutableLiveData<Task?>()
-    val selectedTask: LiveData<Task?> get() = _selectedTask
+    private val _selectedTaskId = MutableStateFlow(0L)
+    val selectedTask: LiveData<Task?> = _selectedTaskId
+        .flatMapLatest { id -> if (id == 0L) flowOf(null) else taskDao.getTaskById(id) }
+        .asLiveData()
 
     fun insertTask(task: Task) = viewModelScope.launch {
         taskDao.insertTask(task)
@@ -79,35 +84,33 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadTaskById(taskId: Long) {
-        if (taskId == 0L) {
-            _selectedTask.postValue(null)
-            return
-        }
-        viewModelScope.launch {
-            taskDao.getTaskById(taskId).collect { task -> // Используем collect для Flow
-                _selectedTask.postValue(task)
-            }
-        }
+        _selectedTaskId.value = taskId
     }
 
     fun clearSelectedTask() {
-        _selectedTask.postValue(null)
+        _selectedTaskId.value = 0L
     }
 
-    // --- Логика для WeekScreen (остается как есть) ---
-    private val _tasksForWeek = MutableStateFlow<Map<LocalDate, List<Task>>>(emptyMap())
-    val tasksForWeek: StateFlow<Map<LocalDate, List<Task>>> = _tasksForWeek.asStateFlow()
-
-    fun loadTasksForWeek(dateInWeek: LocalDate) {
-        viewModelScope.launch {
+    // --- Логика для WeekScreen ---
+    private val _currentWeekDate = MutableStateFlow(LocalDate.now())
+    val tasksForWeek: StateFlow<Map<LocalDate, List<Task>>> = _currentWeekDate
+        .flatMapLatest { dateInWeek ->
             val firstDayOfWeekDevice = java.time.temporal.WeekFields.of(Locale.getDefault()).firstDayOfWeek
             val startOfWeek = dateInWeek.with(java.time.temporal.TemporalAdjusters.previousOrSame(firstDayOfWeekDevice))
             val endOfWeek = startOfWeek.plusDays(6)
-
-            taskDao.getTasksForDateRange(startOfWeek, endOfWeek).collect { tasks ->
-                _tasksForWeek.value = tasks.groupBy { task -> task.date }
-            }
+            taskDao.getTasksForDateRange(startOfWeek, endOfWeek)
         }
+        .map { tasks -> tasks.groupBy { task -> task.date } }
+        .stateIn(
+            scope = viewModelScope,
+            // WhileSubscribed: drops the Room observer when no screen is watching (e.g. app in
+        // background) instead of keeping a cursor open until onCleared.
+        started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyMap()
+        )
+
+    fun loadTasksForWeek(dateInWeek: LocalDate) {
+        _currentWeekDate.value = dateInWeek
     }
 
     // --- Notification system methods ---
